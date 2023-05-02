@@ -22,20 +22,10 @@
 
 cmake_minimum_required( VERSION 3.16 )
 
-
-project( hip_simple_kernels LANGUAGES CXX )
+project( hip_simple_kernels LANGUAGES CXX HIP )
 set( CMAKE_CXX_STANDARD 14 )
 
-find_package(HIP CONFIG)
-
-enable_language(HIP)
-set(CMAKE_HIP_LINKER_PREFERENCE_PROPAGATES 0)
-
-
-
-if( NOT HIP_FOUND )
-  find_package( hip REQUIRED )
-endif()
+find_package( HIP REQUIRED )
 
 set( example_list
   ex0_errors
@@ -45,25 +35,10 @@ set( example_list
   ex3_vadd4by
   ex5_matadd )
 
-message("${CMAKE_CXX_COMPILER_ID}")
-message("${CMAKE_HIP_COMPILER_ID}")
-
-if( CMAKE_CXX_COMPILER MATCHES ".*hipcc")
-  message("hipcc eh?")
-endif()
-if(CMAKE_CXX_COMPILER_ID STREQUAL "ROCMClang")
-  message("w00t")
-endif()
-
 foreach( example ${example_list} )
-
   add_executable( ${example} ${example}.cpp )
 
-  # $HIP_INCLUDE_PATH gets set in hipcc, not by ROCMClang itself.
-    
-  # If we are using hip-clang, we need to get the hip library.
-  target_compile_definitions( ${example} PRIVATE __HIP_PLATFORM_AMD__ )
-  target_link_libraries( ${example} hip::device hip::host )
-  #SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --offload-arch=gfx90c:xnack-")
-  
+  if( NOT CMAKE_CXX_COMPILER MATCHES ".*hipcc")
+    target_link_libraries( ${example} hip::device hip::host )
+   endif()
 endforeach( )
