@@ -25,6 +25,8 @@ cmake_minimum_required( VERSION 3.16 )
 project( hip_simple_kernels LANGUAGES CXX HIP )
 
 set( CMAKE_CXX_STANDARD 14 )
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if($ENV{HIP_PLATFORM} MATCHES "nvidia")
   message(STATUS "HIP_PLATFORM: nvidia")
