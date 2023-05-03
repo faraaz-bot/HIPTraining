@@ -83,15 +83,7 @@ int main()
     assert(hipMalloc(&d_b, valbytes) == hipSuccess);
     assert(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) == hipSuccess);
 
-    hipLaunchKernelGGL(matAdd,
-                       dim3(32, 32),
-                       dim3(ceildiv(M, 32), ceildiv(N, 32)),
-                       0, // sharedMemBytes
-                       0, // stream
-                       d_a,
-                       d_b,
-                       N,
-                       M);
+    matAdd<<<dim3(32, 32), dim3(ceildiv(M, 32), ceildiv(N, 32))>>>(d_a, d_b, N, M);
 
     assert(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) == hipSuccess);
 

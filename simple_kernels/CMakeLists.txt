@@ -22,7 +22,7 @@
 
 cmake_minimum_required( VERSION 3.16 )
 
-project( hip_simple_kernels LANGUAGES CXX HIP )
+project( hip_simple_kernels LANGUAGES CXX )
 
 set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
@@ -40,7 +40,7 @@ find_package( HIP REQUIRED )
 
 
 set( example_list
-  ex1_vadd  
+  ex1_vadd
   ex2_vaddblock
   ex4_vaddgrid
   ex0_errors

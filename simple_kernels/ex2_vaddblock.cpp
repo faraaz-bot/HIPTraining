@@ -67,14 +67,7 @@ int main()
 
     int blockSize = 256;
     int blocks    = ceildiv(N, blockSize);
-    hipLaunchKernelGGL(vecAdd,
-                       dim3(blocks),
-                       dim3(blockSize),
-                       0, // sharedMemBytes
-                       0, // stream
-                       d_a,
-                       d_b,
-                       N);
+    vecAdd<<<dim3(blocks), dim3(blockSize)>>> (d_a, d_b, N);
 
     assert(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) == hipSuccess);
 

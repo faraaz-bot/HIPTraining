@@ -66,13 +66,7 @@ int main()
 
     int blockSize = N;
     int blocks    = 1;
-    hipLaunchKernelGGL(vecAdd,
-                       dim3(blocks),
-                       dim3(blockSize),
-                       0, // sharedMemBytes
-                       0, // stream
-                       d_a,
-                       d_b);
+    vecAdd<<<dim3(blocks), dim3(blockSize)>>> (d_a, d_b);
     rt = hipGetLastError();
     assert(rt == hipSuccess);
 
