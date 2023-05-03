@@ -23,21 +23,30 @@
 cmake_minimum_required( VERSION 3.16 )
 
 project( hip_simple_kernels LANGUAGES CXX HIP )
+
 set( CMAKE_CXX_STANDARD 14 )
+
+if($ENV{HIP_PLATFORM} MATCHES "nvidia")
+  message(STATUS "HIP_PLATFORM: nvidia")
+  add_compile_definitions(__HIP_PLATFORM_NVIDIA__)
+  find_package(CUDAToolkit REQUIRED)
+else()
+  message(STATUS "HIP_PLATFORM: amd")
+endif()
 
 find_package( HIP REQUIRED )
 
+
 set( example_list
-  ex0_errors
+  ex1_vadd  
   ex2_vaddblock
   ex4_vaddgrid
-  ex1_vadd
+  ex0_errors
   ex3_vadd4by
   ex5_matadd )
 
 foreach( example ${example_list} )
   add_executable( ${example} ${example}.cpp )
-
   if( NOT CMAKE_CXX_COMPILER MATCHES ".*hipcc")
     target_link_libraries( ${example} hip::device hip::host )
    endif()
