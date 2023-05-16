@@ -16,7 +16,7 @@ intT1 ceildiv(const intT1 numerator, const intT2 divisor)
     return (numerator + divisor - 1) / divisor;
 }
 
-__global__ void vecAdd(float* a, const float* b, const int N, const int batch)
+__global__ void vecAddBlock(float* a, const float* b, const int N, const int batch)
 {
     const int idx = batch * (blockIdx.x * blockDim.x + threadIdx.x);
     if(idx + batch <= N)
@@ -26,16 +26,6 @@ __global__ void vecAdd(float* a, const float* b, const int N, const int batch)
             a[idx + i] += b[idx + i];
         }
     }
-}
-
-// Print the array to stdout
-void printVec(const std::vector<float> v)
-{
-    for(int i = 0; i < v.size(); ++i)
-    {
-        std::cout << v[i] << " ";
-    }
-    std::cout << "\n";
 }
 
 // Fill the array with some values
@@ -70,14 +60,16 @@ int main()
     assert(hipMalloc(&d_b, valbytes) == hipSuccess);
     assert(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) == hipSuccess);
 
-    int blockSize = 256;
-    int blocks    = ceildiv(N / 4, blockSize);
-    vecAdd<<<dim3(blocks), dim3(blockSize)>>> (d_a, d_b, N, batch);
+    const int blockSize = 256;
+    const int blocks    = ceildiv(N / 4, blockSize);
+    vecAddBlock<<<dim3(blocks), dim3(blockSize)>>> (d_a, d_b, N, batch);
 
     assert(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) == hipSuccess);
 
-    printVec(vala);
-
+    for(const auto& val: vala)
+        std::cout << val << " ";
+    std::cout << "\n";
+    
     // Release device memory
     assert(hipFree(d_a) == hipSuccess);
     assert(hipFree(d_b) == hipSuccess);

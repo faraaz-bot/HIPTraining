@@ -25,15 +25,6 @@ __global__ void vecAdd(float* a, const float* b)
     }
 }
 
-// Print the array to stdout
-void printVec(const std::vector<float> v)
-{
-    for(int i = 0; i < v.size(); ++i)
-    {
-        std::cout << v[i] << " ";
-    }
-    std::cout << "\n";
-}
 
 // Fill the array with some values
 void fillArray(std::vector<float>& v)
@@ -72,7 +63,9 @@ int main()
 
     assert(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) == hipSuccess);
 
-    printVec(vala);
+    for(const auto& val: vala)
+        std::cout << val << " ";
+    std::cout << "\n";
 
     // Release device memory
     assert(hipFree(d_a) == hipSuccess);
