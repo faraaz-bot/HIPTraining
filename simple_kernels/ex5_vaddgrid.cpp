@@ -18,12 +18,13 @@ intT1 ceildiv(const intT1 numerator, const intT2 divisor)
 
 __global__ void vecAddBlock(float* a, const float* b, const int N, const int batch)
 {
-    const int idx = batch * (blockIdx.x * blockDim.x + threadIdx.x);
-    if(idx + batch <= N)
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    for(int i = 0; i < batch; ++i)
     {
-        for(int i = 0; i < batch; ++i)
+        const int pos = i * blockDim.x * gridDim.x + idx;
+        if(pos < N)
         {
-            a[idx + i] += b[idx + i];
+            a[pos] += b[pos];
         }
     }
 }
@@ -43,6 +44,8 @@ int main()
 
     const int N     = 16;
     const int batch = 4;
+    std::cout << "N: " << N << "\n";
+    std::cout << "batch: " << batch << "\n";
     assert(N % batch == 0);
 
     std::vector<float> vala(N);
@@ -60,8 +63,10 @@ int main()
     assert(hipMalloc(&d_b, valbytes) == hipSuccess);
     assert(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) == hipSuccess);
 
-    const int blockSize = 256;
+    const int blockSize = 32;
     const int blocks    = ceildiv(N / 4, blockSize);
+    std::cout << "blockSize: " << blockSize << "\n";
+    std::cout << "blocks: " << blocks << "\n";
     vecAddBlock<<<dim3(blocks), dim3(blockSize)>>> (d_a, d_b, N, batch);
 
     assert(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) == hipSuccess);

@@ -40,12 +40,12 @@ find_package( HIP REQUIRED )
 
 
 set( example_list
-  ex1_vadd
-  ex2_vaddblock
-  ex4_vaddgrid
-  ex0_errors
-  ex3_vadd4by
-  ex5_matadd )
+  ex1_errors
+  ex2_vadd
+  ex3_vaddblock
+  ex4_vadd4by
+  ex5_vaddgrid
+  ex6_matadd )
 
 foreach( example ${example_list} )
   add_executable( ${example} ${example}.cpp )
