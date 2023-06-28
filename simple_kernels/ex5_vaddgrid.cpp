@@ -18,23 +18,17 @@ intT1 ceildiv(const intT1 numerator, const intT2 divisor)
 
 __global__ void vecAddBlock(float* a, const float* b, const int N, const int batch)
 {
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    for(int i = 0; i < batch; ++i)
+    // Solution
     {
-        const int pos = i * blockDim.x * gridDim.x + idx;
-        if(pos < N)
+        const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+        for(int i = 0; i < batch; ++i)
         {
-            a[pos] += b[pos];
+            const int pos = i * blockDim.x * gridDim.x + idx;
+            if(pos < N)
+            {
+                a[pos] += b[pos];
+            }
         }
-    }
-}
-
-// Fill the array with some values
-void fillArray(std::vector<float>& v)
-{
-    for(int i = 0; i < v.size(); ++i)
-    {
-        v[i] = i; //sin(i);
     }
 }
 
@@ -46,38 +40,82 @@ int main()
     const int batch = 4;
     std::cout << "N: " << N << "\n";
     std::cout << "batch: " << batch << "\n";
-    assert(N % batch == 0);
+    if(N % batch != 0)
+    {
+        throw std::runtime_error("N must be divisible by batch");
+    }
 
     std::vector<float> vala(N);
-    fillArray(vala);
+    for(int i = 0; i < vala.size(); ++i)
+    {
+        vala[i] = i; // or whatever you want to fill it with
+    }
 
     std::vector<float> valb(N);
-    fillArray(valb);
-    const size_t valbytes = vala.size() * sizeof(decltype(vala)::value_type);
+    for(int i = 0; i < valb.size(); ++i)
+    {
+        valb[i] = i; // or whatever you want to fill it with
+    }
 
-    float* d_a;
-    assert(hipMalloc(&d_a, valbytes) == hipSuccess);
-    assert(hipMemcpy(d_a, vala.data(), valbytes, hipMemcpyHostToDevice) == hipSuccess);
+    // Solution
+    {
+        const size_t valbytes = vala.size() * sizeof(decltype(vala)::value_type);
 
-    float* d_b;
-    assert(hipMalloc(&d_b, valbytes) == hipSuccess);
-    assert(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) == hipSuccess);
+        float* d_a = nullptr;
+        if(hipMalloc(&d_a, valbytes) != hipSuccess)
+        {
+            throw std::runtime_error("hipMalloc failed");
+        }
+        if(hipMemcpy(d_a, vala.data(), valbytes, hipMemcpyHostToDevice) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+        
+        float* d_b = nullptr;
+        if(hipMalloc(&d_b, valbytes) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+        if(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+        
+        const int blockSize = 32;
+        const int blocks    = ceildiv(N / 4, blockSize);
+        std::cout << "blockSize: " << blockSize << "\n";
+        std::cout << "blocks: " << blocks << "\n";
 
-    const int blockSize = 32;
-    const int blocks    = ceildiv(N / 4, blockSize);
-    std::cout << "blockSize: " << blockSize << "\n";
-    std::cout << "blocks: " << blocks << "\n";
-    vecAddBlock<<<dim3(blocks), dim3(blockSize)>>> (d_a, d_b, N, batch);
+        vecAddBlock<<<dim3(blocks), dim3(blockSize)>>> (d_a, d_b, N, batch);
+        if(hipGetLastError() != hipSuccess)
+        {
+            throw std::runtime_error("kernel execution failed");
+        }
 
-    assert(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) == hipSuccess);
+        if(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+
+        if(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+
+        // Release device memory
+        if(hipFree(d_a) != hipSuccess)
+        {
+            throw std::runtime_error("hipFree failed");
+        }
+        if(hipFree(d_b) != hipSuccess)
+        {
+            throw std::runtime_error("hipFree failed");
+        }
+    }
 
     for(const auto& val: vala)
         std::cout << val << " ";
     std::cout << "\n";
     
-    // Release device memory
-    assert(hipFree(d_a) == hipSuccess);
-    assert(hipFree(d_b) == hipSuccess);
-
     return 0;
 }

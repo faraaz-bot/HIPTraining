@@ -8,16 +8,10 @@
 
 __global__ void vecAdd(float* a, const float* b)
 {
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    a[idx] += b[idx];
-}
-
-// Fill the array with some values
-void fillArray(std::vector<float>& v)
-{
-    for(int i = 0; i < v.size(); ++i)
+    // Solution
     {
-        v[i] = i; //sin(i);
+        const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+        a[idx] += b[idx];
     }
 }
 
@@ -28,37 +22,69 @@ int main()
     const int N = 16;
 
     std::vector<float> vala(N);
-    fillArray(vala);
+    for(int i = 0; i < vala.size(); ++i)
+    {
+        vala[i] = i; // or whatever you want to fill it with
+    }
 
     std::vector<float> valb(N);
-    fillArray(valb);
-    const size_t valbytes = vala.size() * sizeof(decltype(vala)::value_type);
+    for(int i = 0; i < valb.size(); ++i)
+    {
+        valb[i] = i; // or whatever you want to fill it with
+    }
+    
+    // Solution:
+    {
+        const size_t valbytes = vala.size() * sizeof(decltype(vala)::value_type);
+        
+        float* d_a = nullptr;
+        if(hipMalloc(&d_a, valbytes) != hipSuccess)
+        {
+            throw std::runtime_error("hipMalloc failed");
+        }
+        if(hipMemcpy(d_a, vala.data(), valbytes, hipMemcpyHostToDevice) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+        
+        float* d_b = nullptr;
+        if(hipMalloc(&d_b, valbytes) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+        if(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
 
-    hipError_t rt = hipSuccess;
+        int blockSize = N;
+        int blocks    = 1;
+        vecAdd<<<dim3(blocks), dim3(blockSize)>>>(d_a, d_b);
+        if(hipGetLastError() != hipSuccess)
+        {
+            throw std::runtime_error("kernel execution failed");
+        }
 
-    float* d_a = nullptr;
-    assert(hipMalloc(&d_a, valbytes) == hipSuccess);
-    assert(hipMemcpy(d_a, vala.data(), valbytes, hipMemcpyHostToDevice) == hipSuccess);
-
-    float* d_b = nullptr;
-    assert(hipMalloc(&d_b, valbytes) == hipSuccess);
-    assert(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) == hipSuccess);
-
-    int blockSize = N;
-    int blocks    = 1;
-    vecAdd<<<dim3(blocks), dim3(blockSize)>>>(d_a, d_b);
-    rt = hipGetLastError();
-    assert(rt == hipSuccess);
-
-    assert(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) == hipSuccess);
-
+        if(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+        
+        // Release device memory
+        if(hipFree(d_a) != hipSuccess)
+        {
+            throw std::runtime_error("hipFree failed");
+        }
+        if(hipFree(d_b) != hipSuccess)
+        {
+            throw std::runtime_error("hipFree failed");
+        }
+    }
+    
     for(const auto& val: vala)
         std::cout << val << " ";
     std::cout << "\n";
 
-    // Release device memory
-    assert(hipFree(d_a) == hipSuccess);
-    assert(hipFree(d_b) == hipSuccess);
 
     return 0;
 }

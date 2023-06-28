@@ -19,15 +19,19 @@ intT1 ceildiv(const intT1 numerator, const intT2 divisor)
 // Kernel for adding one 2D array to another
 __global__ void matAdd(float* a, const float* b, const int Nx, const int Ny)
 {
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int idy = blockIdx.y * blockDim.y + threadIdx.y;
-    if(idx < Nx && idy < Ny)
+    // Solution
     {
-        const int pos = idx + Nx * idy;
-        a[pos] += b[pos];
+        const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+        const int idy = blockIdx.y * blockDim.y + threadIdx.y;
+        if(idx < Nx && idy < Ny)
+        {
+            const int pos = idx + Nx * idy;
+            a[pos] += b[pos];
+        }
     }
 }
 
+// Helper functions for filling and showing matrices
 void fillMatrix(std::vector<float>& mat, const int m, const int n)
 {
     assert(mat.size() == n * m);
@@ -40,7 +44,6 @@ void fillMatrix(std::vector<float>& mat, const int m, const int n)
         }
     }
 }
-
 void showMatrix(const std::vector<float> mat, const int m, const int n)
 {
     assert(mat.size() == n * m);
@@ -73,26 +76,54 @@ int main()
     fillMatrix(valb, N, M);
     showMatrix(valb, N, M);
 
-    const size_t valbytes = vala.size() * sizeof(decltype(vala)::value_type);
+    // Solution
+    {
+        const size_t valbytes = vala.size() * sizeof(decltype(vala)::value_type);
 
-    float* d_a;
-    assert(hipMalloc(&d_a, valbytes) == hipSuccess);
-    assert(hipMemcpy(d_a, vala.data(), valbytes, hipMemcpyHostToDevice) == hipSuccess);
+        float* d_a = nullptr;
+        if(hipMalloc(&d_a, valbytes) != hipSuccess)
+        {
+            throw std::runtime_error("hipMalloc failed");
+        }
+        if(hipMemcpy(d_a, vala.data(), valbytes, hipMemcpyHostToDevice) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+        
+        float* d_b = nullptr;
+        if(hipMalloc(&d_b, valbytes) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
+        if(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
 
-    float* d_b;
-    assert(hipMalloc(&d_b, valbytes) == hipSuccess);
-    assert(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) == hipSuccess);
+        matAdd<<<dim3(32, 32), dim3(ceildiv(M, 32), ceildiv(N, 32))>>>(d_a, d_b, N, M);
+        if(hipGetLastError() != hipSuccess)
+        {
+            throw std::runtime_error("kernel execution failed");
+        }
 
-    matAdd<<<dim3(32, 32), dim3(ceildiv(M, 32), ceildiv(N, 32))>>>(d_a, d_b, N, M);
+        if(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) != hipSuccess)
+        {
+            throw std::runtime_error("hipMemcpy failed");
+        }
 
-    assert(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) == hipSuccess);
+        // Release device memory
+        if(hipFree(d_a) != hipSuccess)
+        {
+            throw std::runtime_error("hipFree failed");
+        }
+        if(hipFree(d_b) != hipSuccess)
+        {
+            throw std::runtime_error("hipFree failed");
+        }
+    }
 
     std::cout << "output:\n";
     showMatrix(vala, N, M);
-
-    // Release device memory
-    assert(hipFree(d_a) == hipSuccess);
-    assert(hipFree(d_b) == hipSuccess);
-
+    
     return 0;
 }
