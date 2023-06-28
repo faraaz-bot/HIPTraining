@@ -10,8 +10,7 @@ __global__ void vecAdd(float* a, const float* b)
 {
     // Solution
     {
-        const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-        a[idx] += b[idx];
+        // Put your solution here.
     }
 }
 
@@ -35,50 +34,7 @@ int main()
     
     // Solution:
     {
-        const size_t valbytes = vala.size() * sizeof(decltype(vala)::value_type);
-        
-        float* d_a = nullptr;
-        if(hipMalloc(&d_a, valbytes) != hipSuccess)
-        {
-            throw std::runtime_error("hipMalloc failed");
-        }
-        if(hipMemcpy(d_a, vala.data(), valbytes, hipMemcpyHostToDevice) != hipSuccess)
-        {
-            throw std::runtime_error("hipMemcpy failed");
-        }
-        
-        float* d_b = nullptr;
-        if(hipMalloc(&d_b, valbytes) != hipSuccess)
-        {
-            throw std::runtime_error("hipMemcpy failed");
-        }
-        if(hipMemcpy(d_b, valb.data(), valbytes, hipMemcpyHostToDevice) != hipSuccess)
-        {
-            throw std::runtime_error("hipMemcpy failed");
-        }
-
-        int blockSize = N;
-        int blocks    = 1;
-        vecAdd<<<dim3(blocks), dim3(blockSize)>>>(d_a, d_b);
-        if(hipGetLastError() != hipSuccess)
-        {
-            throw std::runtime_error("kernel execution failed");
-        }
-
-        if(hipMemcpy(vala.data(), d_a, valbytes, hipMemcpyDeviceToHost) != hipSuccess)
-        {
-            throw std::runtime_error("hipMemcpy failed");
-        }
-        
-        // Release device memory
-        if(hipFree(d_a) != hipSuccess)
-        {
-            throw std::runtime_error("hipFree failed");
-        }
-        if(hipFree(d_b) != hipSuccess)
-        {
-            throw std::runtime_error("hipFree failed");
-        }
+        // Put your solution here.
     }
     
     for(const auto& val: vala)

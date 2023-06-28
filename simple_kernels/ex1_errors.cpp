@@ -5,7 +5,7 @@ __global__ void ksegfault(float* a)
 {
     // Solution:
     {
-        *a = 1.0;
+        // Put your solution here.
     }
 }
 
@@ -25,22 +25,7 @@ int main()
 
     // Solution:
     {
-        size_t toomuch = (size_t)1 << 31;
-
-        hipMalloc(&d_p, toomuch);
-        if(hipPeekAtLastError() != hipSuccess)
-        {
-            std::cout << "\tWell, that didn't work.\n";
-        }
-        if(hipGetLastError() != hipSuccess)
-        {
-            std::cout << "\tStill not good.\n";
-        }
-        if(hipGetLastError() == hipSuccess)
-        {
-            std::cout << "\tLooks like everything is fine now!\n";
-        }
-        std::cout << std::endl;
+        // Put your solution here.
     }
     
     // Release device memory
@@ -59,28 +44,7 @@ int main()
 
     // Solution:
     {
-        // We don't allocate the memory so that we can observe the error
-        // behaviour:
-        //assert(hipMalloc(&d_a, sizeof(float)) == hipSuccess);
-    
-        // NB: this actually aborts before we get to the return-code
-        // logic.
-        ksegfault<<<dim3(1), dim3(1)>>>(d_a);
-        hipDeviceSynchronize();
-        if(hipGetLastError() != hipSuccess)
-        {
-            std::cout << "\tError running ksegfault!\n";
-        }
-        else
-        {
-            std::cout << "\tksegfault is totally fine!\n";
-        }
-        
-        // Release device memory
-        if(d_a != nullptr)
-        {
-            assert(hipFree(d_a) == hipSuccess);
-        }
+        // Put your solution here.
     }
     
     return 0;
