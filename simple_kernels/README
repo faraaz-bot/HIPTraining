@@ -1,19 +1,43 @@
+## Environment, configuration, and compilation:
+
+# Set up your cmake environment to detect ROCm:
+export CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/rocm/lib/cmake/
+
+# Configure hipcc:
 cmake -DCMAKE_CXX_COMPILER=hipcc ..
+
+# Configure amd-clang:
 cmake -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++ -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/amdclang++  ..
 
-Exercise 1:
+# Configure hipcc-nvcc
+Upgrade to a later cmake (something like 3.24 or later; may need to install libssl-dev on ubuntu).
+Grab the source files, and then build and install with:
+cmake -DCMAKE_INSTALL_PREFIX=${HOME}/cmake .. && make && make install
+export PATH=${HOME}/cmake/bin:${PATH}
+
+export HIP_PLATFORM=nvidia
+cmake -DCMAKE_CXX_COMPILER=hipcc ..
+
+# Compile with make:
+export MAKEFLAGS=-j$(nproc)
+make
+
+
+## Exercises:
+
+# Exercise 1:
 Create a vector addition kernel which adds one vector to another (ie
 a[i] += b[i]) – 1 thread per element
 
-Exercise 2:
+# Exercise 2:
 Vector addition kernel – 1 thread per element with block size equals
 256, and array size not a multiple of 256
 
-Exercise 3:
+# Exercise 3:
 Vector addition kernel – 4 consecutive elements per thread
 
-Exercise 4:
+# Exercise 4:
 Vector addition kernel – multiple elements per thread (Grid-stride loop)
 
-Exercise 5:
+# Exercise 5:
 Matrix addition kernel – 1 thread per element using 2D grid of 2D thread blocks
