@@ -13,6 +13,8 @@ Exercise instructions:
 
 3. Observe the performance of each of the methods and cross-reference with your learnings from cross-lane operations training module.
 
+4. Increase the number of trial runs to 1000. How does this affect your performance observations?
+
 Food for thought:
 
 1. Consider changing the datatype to double (8 byte elements). Would your methods still work? Why?
