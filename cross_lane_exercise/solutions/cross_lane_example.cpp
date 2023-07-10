@@ -337,8 +337,8 @@ int main(int argc, char** argv)
     HIP_CHECK(hipMemcpy(d_input, input.data(), size * sizeof(T), hipMemcpyHostToDevice));
 
     hipEvent_t startEvent, stopEvent;
-    CHECK_HIP_ERROR(hipEventCreate(&startEvent));
-    CHECK_HIP_ERROR(hipEventCreate(&stopEvent));
+    HIP_CHECK(hipEventCreate(&startEvent));
+    HIP_CHECK(hipEventCreate(&stopEvent));
 
     switch(test_id)
     {
@@ -392,8 +392,8 @@ int main(int argc, char** argv)
         break;
     default:
         std::cout << "Invalid test selection\n";
-        CHECK_HIP_ERROR(hipEventDestroy(startEvent));
-        CHECK_HIP_ERROR(hipEventDestroy(stopEvent));
+        HIP_CHECK(hipEventDestroy(startEvent));
+        HIP_CHECK(hipEventDestroy(stopEvent));
         HIP_CHECK(hipFree(d_input));
         HIP_CHECK(hipFree(d_output));
         exit(0);
@@ -404,10 +404,10 @@ int main(int argc, char** argv)
 
     // Calculate elapsed time
     auto elapsedTimeMs = 0.0f;
-    CHECK_HIP_ERROR(hipEventSynchronize(stopEvent));
-    CHECK_HIP_ERROR(hipEventElapsedTime(&elapsedTimeMs, startEvent, stopEvent));
-    CHECK_HIP_ERROR(hipEventDestroy(startEvent));
-    CHECK_HIP_ERROR(hipEventDestroy(stopEvent));
+    HIP_CHECK(hipEventSynchronize(stopEvent));
+    HIP_CHECK(hipEventElapsedTime(&elapsedTimeMs, startEvent, stopEvent));
+    HIP_CHECK(hipEventDestroy(startEvent));
+    HIP_CHECK(hipEventDestroy(stopEvent));
 
     std::cout << "Element count: " << size << " Elapsed Time (ms): " << elapsedTimeMs << std::endl; 
 
