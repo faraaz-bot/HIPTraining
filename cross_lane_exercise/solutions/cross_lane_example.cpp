@@ -80,7 +80,7 @@
 #include <numeric>
 #include <vector>
 
-#define TRIAL_NUM 100
+#define TRIAL_NUM 101
 
 #define HIP_CHECK(condition)                                                           \
     {                                                                                  \
@@ -203,6 +203,30 @@ __device__ static inline DataT bpermute_impl_b32(DataT src0, uint32_t laneId)
     return result.data;
 }
 
+// Permute __builtin wrapper
+template <typename DataT>
+__device__ static inline DataT permute_impl_b32(DataT src0, uint32_t laneId)
+{
+    constexpr int word_count = ceilDiv(sizeof(DataT), sizeof(int));
+
+    auto alias0 = B32Helper<DataT>{ src0 };
+    auto result = B32Helper<DataT>{ static_cast<DataT>(0) };
+
+    // The __builtin operates on dword element sizes (e.g. b32 register elements)
+    // If for example the datatype is f64, we must iterate the operation over upper
+    // and lower 32b elements.
+    #pragma unroll
+    for(int i = 0; i < word_count; i++)
+    {
+        // NOTE: final address is laneId * 4
+        result.b32[i] = __builtin_amdgcn_ds_permute(
+            laneId << 2,    // Lane ID to push to for current thread 
+            alias0.b32[i]); // Src value
+    }
+    
+    return result.data;
+}
+
 ///////////////////////////////////////////////////////////
 /// Test functions that use the backend implementations ///
 ///////////////////////////////////////////////////////////
@@ -293,6 +317,25 @@ __global__ void test_with_bpermute(const DataT* d_input, DataT* d_output)
     d_output[idx] = tmp;
 }
 
+template<typename DataT>
+__global__ void test_with_permute(const DataT* d_input, DataT* d_output)
+{
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+
+    // Ensure loads / stores are outside trial loop;
+    auto tmp = d_input[idx];
+
+    // Neighbouring index is inversion of LSB
+#pragma unroll
+    for(int i = 0; i < TRIAL_NUM; i++)
+    {
+        // Add one to result after bpermute
+        tmp = permute_impl_b32(tmp, idx ^ 0x1) + static_cast<DataT>(1);
+    }
+
+    d_output[idx] = tmp;
+}
+
 ///////////////////////////////////////////////////////////
 /// Validation function on CPU to check the result      ///
 ///////////////////////////////////////////////////////////
@@ -321,7 +364,7 @@ int main(int argc, char** argv)
     }
 
     const int blockDim = 64;
-    const int gridDim  = 512;
+    const int gridDim  = 64;
     const int size   = gridDim * blockDim;
 
     std::vector<T> input(size);
@@ -380,6 +423,18 @@ int main(int argc, char** argv)
         break;
     case 3:
         hipExtLaunchKernelGGL(test_with_bpermute,
+                          dim3(gridDim),
+                          dim3(blockDim),
+                          0, // sharedMemBytes
+                          0, // stream
+                          startEvent, // Event start
+                          stopEvent, // event stop
+                          0, // flags
+                          (const T*)d_input,
+                          d_output);
+        break;
+    case 4:
+        hipExtLaunchKernelGGL(test_with_permute,
                           dim3(gridDim),
                           dim3(blockDim),
                           0, // sharedMemBytes
