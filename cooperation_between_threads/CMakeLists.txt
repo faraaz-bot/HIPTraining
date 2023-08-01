@@ -40,6 +40,7 @@ find_package( HIP REQUIRED )
 
 
 set( example_list
+  moving_filter
   numerical_integration )
 
 foreach( example ${example_list} )
