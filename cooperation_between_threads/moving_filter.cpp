@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <iostream>
 #include <fstream>
-#include <cmath>
+#include <vector>
 #include <hip/hip_runtime.h>
 
 __global__ void movingFilter(const float* inData, float* outData, const int K)
