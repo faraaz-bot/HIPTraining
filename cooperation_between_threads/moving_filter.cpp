@@ -11,7 +11,7 @@ __global__ void movingFilter(const float* inData, float* outData, const int K)
 }
 
 /* Function to load from filesystem into vector. */
-void loadData(std::string file, std::vector<float> data)
+void loadData(std::string file, std::vector<float> &data)
 {
     std::ifstream f;
     f.open(file);
@@ -23,7 +23,7 @@ void loadData(std::string file, std::vector<float> data)
 }
 
 /* Function to write to filesystem from vector. */
-void writeData(std::string file, std::vector<float> data)
+void writeData(std::string file, std::vector<float> &data)
 {
     std::ofstream myFile;
     myFile.open(file);
