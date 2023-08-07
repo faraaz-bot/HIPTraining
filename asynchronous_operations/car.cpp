@@ -12,6 +12,11 @@ Car::Car()
     // to not optimize out the sleep statements - DO NOT MODIFY
     HIP_CALL(hipMalloc((void**)&tmp, sizeof(bool)));
 
+    /***************************************
+     Modify this function below as required
+    ***************************************/
+
+    // Allocate host memory
     frame   = (bool*)malloc(sizeof(bool));
     engine  = (bool*)malloc(sizeof(bool));
     body    = (bool*)malloc(sizeof(bool));
@@ -24,11 +29,6 @@ Car::Car()
     *wheels  = false;
     *shipped = false;
 
-    /***************************************
-     Modify this function below as required
-    ***************************************/
-
-
 }
 
 Car::~Car()
@@ -40,12 +40,7 @@ Car::~Car()
      Modify this function below as required
     ***************************************/
 
-
-    /***************************************
-     Modify this function above as required
-    ***************************************/
-
-    // Clean up host memory
+    // Free host memory
     free(frame);
     free(engine);
     free(body);
