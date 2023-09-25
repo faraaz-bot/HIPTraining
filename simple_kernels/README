@@ -25,19 +25,49 @@ make
 
 ## Exercises:
 
-# Exercise 1:
-Create a vector addition kernel which adds one vector to another (ie
-a[i] += b[i]) – 1 thread per element
 
-# Exercise 2:
-Vector addition kernel – 1 thread per element with block size equals
-256, and array size not a multiple of 256
+# Exercise 1: errors on purpose!
 
-# Exercise 3:
-Vector addition kernel – 4 consecutive elements per thread
+This exercise is about errors and handling them.  The first is
+catching a runtime error; try allocating a ridiculously large amount
+of memory, and detect the error code.  The second is to create a kernel
+that segfaults and detect the error in the kernel launch.
 
-# Exercise 4:
-Vector addition kernel – multiple elements per thread (Grid-stride loop)
 
-# Exercise 5:
-Matrix addition kernel – 1 thread per element using 2D grid of 2D thread blocks
+# Exercise 2: vector addition with one thread-block.
+
+Compute a += b for a and b vectors of length N <= 1024.  In this case
+we can use 1 thread per element, and since N<= 1024, we can just use
+on thread-block.
+
+
+# Exercise 3: vector addition with multiple thread-block.
+
+Same as in exercise 2, but now we have N > 1024, and need multiple
+thread-blocks.  N is not necessarily divisible by the block size, so
+make sure to include a thread-guard.
+
+
+# Exercise 4: vector addition with multiple elements per thread.
+
+Since the element-wise operation is quite simple and quick, it can be
+faster to have each thread treat more than one element by adding a loop
+in the kernel itself.  In this exersize, have each thread treat, say, 4
+contiguous elements.  That is, thread 0 computes a[0], a[1], a[2], and a[3];
+thread 1 computesa[4], a[5], a[6], and a[7]; etc.
+
+
+# Exercise 5: multiple elements per thread with contiguous reads
+
+In exercise 4, each thread read contiguous elements; one can get
+better performance by having contiguous threads read contiguous data.
+Suppose that T threads are launched in total.  In this exercise,
+modify the solution to exercise 4 so that thread 0 computes a[0],
+a[T], a[2T], and a[3T]; thread 1 computes a[1], a[T + 1], a[2T + 1],
+and a[3T + 1], etc.
+
+
+# Exercise 6: Matrix addition kernel.
+
+Given matrices A and B, compute A+B using a 2D grid for general matrix
+dimensions.
