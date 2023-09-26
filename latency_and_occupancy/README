@@ -1,0 +1,9 @@
+# Exercises for Latency Hiding and Occupancy
+
+# Exercise 1: Measure empty kernel launch latency via the empty kernel.
+
+# Exercise 2: Occupancy computation and measurement (via HIP APIs)
+
+# Exercise 3: vector addition, but we add extra LDS to reduce latency
+
+# Exercise 4: thread traace to see stalls
