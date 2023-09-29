@@ -28,8 +28,6 @@ int main()
 
     const int N = 1<<15;
 
-    
-    
     {
         size_t lds_bytes = 0;//1 << 2;
 
@@ -38,7 +36,6 @@ int main()
         
         dim3 gridDim(gridSize);
         dim3 blockDim(blockSize);
-        int max_blocks_per_sm = 0;
         
         auto ret = hipOccupancyMaxPotentialBlockSize(
             &gridSize, // int* gridSize
@@ -47,7 +44,9 @@ int main()
             lds_bytes, //size_t dynSharedMemPerBlk,
             1024 //int blockSizeLimit 
             );
-                            
+
+        // https://docs.amd.com/projects/HIP/en/docs-5.0.0/doxygen/html/group___occupancy.html#ga59c488f35b0ba4b4938ba16e1a7ed7ec
+        
         // const auto ret = hipOccupancyMaxActiveBlocksPerMultiprocessor(
         //     &max_blocks_per_sm, vecAdd, blockDim.x * blockDim.y * blockDim.z, lds_bytes);
         if(ret != hipSuccess)  {
@@ -58,9 +57,20 @@ int main()
             ss << " which means: " << hipGetErrorString(ret);
             throw std::runtime_error(ss.str());
         }
-        std::cout << "gridSize: " << gridSize << "\tblockSize: " << blockSize << "\n";
+        std::cout << "Launch parameters for maximum occupancy: gridSize "
+                  << gridSize << "\tblockSize " << blockSize << "\n";
 
-        std::cout << "occupancy: " << max_blocks_per_sm << "\n";
+        int numBlocks = 0;
+        ret = hipOccupancyMaxActiveBlocksPerMultiprocessor(
+            &numBlocks, // int* numBlocks,
+            vecAdd,     // const void* f,
+            blockSize,  // int blockSize,
+            lds_bytes   //size_t dynSharedMemPerBlk 
+            );
+        if(ret != hipSuccess)  {
+            throw std::runtime_error("hipOccupancyMaxActiveBlocksPerMultiprocessor failed");
+        }
+        std::cout << "Occupancy (numBlocks): " << numBlocks << "\n";
 
         std::vector<float> vala(N);
         std::vector<float> valb(N);
@@ -70,11 +80,11 @@ int main()
         float* d_b = nullptr;
         ret = hipMalloc(&d_a, valbytes);
         if(ret != hipSuccess)  {
-            throw std::runtime_error("hipMalloc faile");
+            throw std::runtime_error("hipMalloc failed");
         }
         ret = hipMalloc(&d_b, valbytes);
         if(ret != hipSuccess)  {
-            throw std::runtime_error("hipMalloc faile");
+            throw std::runtime_error("hipMalloc failed");
         }
         if(hipMemcpy(d_a, vala.data(), valbytes, hipMemcpyHostToDevice) != hipSuccess)
         {
@@ -85,9 +95,9 @@ int main()
             throw std::runtime_error("hipMemcpy failed");
         }
 
-
-        
         vecAdd<<<gridDim, blockDim, lds_bytes >>>(d_a, d_b, N);
+
+        // FIXME: copy data back, check results, get performance, check return code.
     }
 
     
