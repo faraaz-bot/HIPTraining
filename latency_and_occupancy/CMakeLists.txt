@@ -38,14 +38,20 @@ endif()
 
 find_package( HIP REQUIRED )
 
+find_package( Boost COMPONENTS program_options REQUIRED)
 
 set( example_list
+  ex1_latency
   ex2_occupancy
+  ex3_vadd
   )
 
 foreach( example ${example_list} )
   add_executable( ${example} ${example}.cpp )
   if( NOT CMAKE_CXX_COMPILER MATCHES ".*hipcc")
-    target_link_libraries( ${example} hip::device hip::host )
+    target_link_libraries( ${example} hip::device hip::host Boost::program_options )
+  else()
+    target_link_libraries( ${example} Boost::program_options )
    endif()
 endforeach()
+ 

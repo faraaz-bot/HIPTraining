@@ -17,12 +17,10 @@ intT1 ceildiv(const intT1 numerator, const intT2 divisor)
     return (numerator + divisor - 1) / divisor;
 }
 
-__global__
-//__launch_bounds__(512, 0)
-void vecAdd(float * const a, const float * const  b, const int N)
+__global__ void vecAdd(float * const a, const float * const  b, const int N)
 {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if(idx < N )
+    if(idx < N)
     {
         a[idx] += b[idx];
     }
@@ -53,37 +51,13 @@ int main(int argc, char *argv[])
     std::cout << "N: " << N << "\n";
     std::cout << "LDS bytes: " << lds_bytes << "\n";
     std::cout << "Thread block size: " << blockSize << "\n";
-    int gridSize = ceildiv(N, blockSize);
-    std::cout << "Grid size: " << gridSize << "\n";
+    
+    dim3 gridDim(blockSize);
+    dim3 blockDim(ceildiv(N, blockSize));
 
-    dim3 gridDim(gridSize);
-    dim3 blockDim(blockSize);
-        
-    int best_gridSize = 0;
-    int best_blockSize = 0;
-    auto ret = hipOccupancyMaxPotentialBlockSize(
-        &best_gridSize, // int* gridSize
-        &best_blockSize, // int* blockSize,
-        vecAdd, //hipFunction_t f,
-        lds_bytes, //size_t dynSharedMemPerBlk,
-        1024 //int blockSizeLimit 
-        );
-
-    // https://docs.amd.com/projects/HIP/en/docs-5.0.0/doxygen/html/group___occupancy.html#ga59c488f35b0ba4b4938ba16e1a7ed7ec
-        
-    if(ret != hipSuccess)  {
-        std::stringstream ss;
-        ss << "hipOccupancyMaxActiveBlocksPerMultiprocessorkernel failed with code ";
-        ss << ret;
-        ss << " " << hipGetErrorName(ret);
-        ss << " which means: " << hipGetErrorString(ret);
-        throw std::runtime_error(ss.str());
-    }
-    std::cout << "Launch parameters for maximum occupancy:\n\tgridSize "
-              << best_gridSize << "\n\tblockSize " << best_blockSize << "\n";
-
+    // Print the occupancy:
     int numBlocks = 0;
-    ret = hipOccupancyMaxActiveBlocksPerMultiprocessor(
+    auto ret = hipOccupancyMaxActiveBlocksPerMultiprocessor(
         &numBlocks, // int* numBlocks,
         vecAdd,     // const void* f,
         blockSize,  // int blockSize,
@@ -98,7 +72,7 @@ int main(int argc, char *argv[])
     std::vector<float> valb(N);
     for(int i = 0; i < N; ++i) {
         vala[i] = 1.0 / (1.0 + i);
-        valb[i] = 2.0 / (1.0 + i * i);
+        valb[i] = 2.0 / (1.0 + i);
     }
     
     const size_t valbytes = vala.size() * sizeof(decltype(vala)::value_type);
@@ -120,6 +94,7 @@ int main(int argc, char *argv[])
     {
         throw std::runtime_error("hipMemcpy failed");
     }
+
 
     // Create HIP events for timing
     hipEvent_t startEvent, endEvent;
@@ -146,24 +121,6 @@ int main(int argc, char *argv[])
     hipEventElapsedTime(&kernelTime, startEvent, endEvent);
     std::cout << "Kernel execution time: " << kernelTime / 10.0 << " ms\n";
 
-    // Correctness test:
-    std::vector<float> valout(N);
-    if(hipMemcpy(valout.data(), d_a, valbytes, hipMemcpyDeviceToHost) != hipSuccess)
-    {
-        throw std::runtime_error("hipMemcpy failed");
-    }
-    double errmax = 0.0;
-    for(int i = 0; i < valout.size(); ++i) {
-        const auto a = vala[i];
-        const auto b = valb[i];
-        const auto aplusb = valout[i];
-        const auto diff = std::abs(a + b - aplusb);
-        if(diff > errmax) {
-            errmax = diff;
-        }
-    }
-    std::cout << "errmax: " << errmax << "\n";
-
     // Clean up: free GPU memory:
     ret = hipFree(d_a);
     if(ret != hipSuccess) {
@@ -173,6 +130,9 @@ int main(int argc, char *argv[])
     if(ret != hipSuccess) {
         throw std::runtime_error("hipFree failed.");
     }
+
     
     return 0;
+
+    
 }
