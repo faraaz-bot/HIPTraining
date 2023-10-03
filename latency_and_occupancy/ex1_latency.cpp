@@ -25,8 +25,8 @@ int main(int argc, char *argv[])
 {
     // Command-line specified arguments
     int N;
-    int lds_bytes = 0;
-    int blockSize = 0;
+    int lds_bytes;
+    int blockSize;
     
     po::options_description opdesc("rocfft rider command line options");
     opdesc.add_options()("h", "produces this help message")
@@ -46,48 +46,39 @@ int main(int argc, char *argv[])
     std::cout << "N: " << N << "\n";
     std::cout << "LDS bytes: " << lds_bytes << "\n";
     std::cout << "Thread block size: " << blockSize << "\n";
-
-    int max_blockSize = 0;
-    auto ret = hipDeviceGetAttribute(&max_blockSize,
-                                     hipDeviceAttributeMaxBlockDimX,
-                                     0); // device 0
-    if(ret != hipSuccess) {
-        throw std::runtime_error("hipDeviceGetAttribute failed");
-    }
-    std::cout << "max_blockSize: " << max_blockSize << "\n";
-    
     int gridSize = ceildiv(N, blockSize);
-        
-    dim3 gridDim(gridSize);
-    dim3 blockDim(blockSize);
-        
-    // Create HIP events for timing
-    hipEvent_t startEvent, endEvent;
-    hipEventCreate(&startEvent);
-    hipEventCreate(&endEvent);
-  
-    // Record start event
-    hipEventRecord(startEvent, 0);
+    std::cout << "Grid size:         " << gridSize << "\n";
 
-    emptykernel<<<gridDim, blockDim >>>();
+    // Solution:
+    {
+        dim3 gridDim(gridSize);
+        dim3 blockDim(blockSize);
+        
+        // Create HIP events for timing
+        hipEvent_t startEvent, endEvent;
+        hipEventCreate(&startEvent);
+        hipEventCreate(&endEvent);
+  
+        // Record start event
+        hipEventRecord(startEvent, 0);
+
+        // Launch the kernel
+        emptykernel<<<gridDim, blockDim >>>();
     
-    hipDeviceSynchronize();
-    if(hipGetLastError() != hipSuccess) {
-        std::cerr << "Error in kernel launch\n";
+        hipDeviceSynchronize();
+        if(hipGetLastError() != hipSuccess) {
+            std::cerr << "Error in kernel launch\n";
+        }
+    
+        // Record end event
+        hipEventRecord(endEvent, 0);
+        hipEventSynchronize(endEvent);
+    
+        // Calculate and print kernel execution time
+        float kernelTime;
+        hipEventElapsedTime(&kernelTime, startEvent, endEvent);
+        std::cout << "Kernel execution time: " << kernelTime << " ms\n";
     }
     
-    // Record end event
-    hipEventRecord(endEvent, 0);
-    hipEventSynchronize(endEvent);
-    
-    // Calculate and print kernel execution time
-    float kernelTime;
-    hipEventElapsedTime(&kernelTime, startEvent, endEvent);
-    std::cout << "Kernel execution time: " << kernelTime / 10.0 << " ms\n";
-    
-    
-    
-    return 0;
-
-    
+    return EXIT_SUCCESS;
 }

@@ -46,6 +46,7 @@ set( example_list
   ex3_vadd
   )
 
+
 foreach( example ${example_list} )
   add_executable( ${example} ${example}.cpp )
   if( NOT CMAKE_CXX_COMPILER MATCHES ".*hipcc")
@@ -54,4 +55,6 @@ foreach( example ${example_list} )
     target_link_libraries( ${example} Boost::program_options )
    endif()
 endforeach()
- 
+
+#target_compile_options( ex2_occupancy PUBLIC --save-temps)
+
