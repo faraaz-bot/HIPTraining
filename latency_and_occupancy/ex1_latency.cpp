@@ -51,33 +51,7 @@ int main(int argc, char *argv[])
 
     // Solution:
     {
-        dim3 gridDim(gridSize);
-        dim3 blockDim(blockSize);
         
-        // Create HIP events for timing
-        hipEvent_t startEvent, endEvent;
-        hipEventCreate(&startEvent);
-        hipEventCreate(&endEvent);
-  
-        // Record start event
-        hipEventRecord(startEvent, 0);
-
-        // Launch the kernel
-        emptykernel<<<gridDim, blockDim >>>();
-    
-        hipDeviceSynchronize();
-        if(hipGetLastError() != hipSuccess) {
-            std::cerr << "Error in kernel launch\n";
-        }
-    
-        // Record end event
-        hipEventRecord(endEvent, 0);
-        hipEventSynchronize(endEvent);
-    
-        // Calculate and print kernel execution time
-        float kernelTime;
-        hipEventElapsedTime(&kernelTime, startEvent, endEvent);
-        std::cout << "Kernel execution time: " << kernelTime << " ms\n";
     }
     
     return EXIT_SUCCESS;
