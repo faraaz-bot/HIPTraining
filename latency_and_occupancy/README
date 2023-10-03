@@ -19,8 +19,9 @@ https://docs.amd.com/projects/HIP/en/docs-5.0.0/doxygen/html/group___occupancy.h
 # Exercise 1: The empty kernel
 
 Measure empty kernel launch latency via the empty kernel; see how this
-is affected by the number of waves, threa-block size, and LDS use.
+is affected by the number of waves, thread-block size, and LDS use.
 
+Use HIP events to accurately time your kernels.
 
 # Exercise 2: Occupancy computation and measurement
 
@@ -49,7 +50,10 @@ of occupancy via kernel launches and the HIP API.
   can just uncomment the command in CMakeLists.txt to enable this
   flag.
 
-# Exercise 3: vector addition, but we add extra LDS to reduce latency
+- Compile using `-Rpass-analysis=kernel-resource-usage` and observe
+  the occupancy info at compile time!
+
+# Exercise 3: vector addition, but we add extra LDS to reduce occupancy
 
 Using the results from exercise 2, determine the performance
 characteristics as a function of occupancy for the vector-add kernel.

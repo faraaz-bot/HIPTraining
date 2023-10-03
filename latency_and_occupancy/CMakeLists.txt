@@ -57,4 +57,4 @@ foreach( example ${example_list} )
 endforeach()
 
 #target_compile_options( ex2_occupancy PUBLIC --save-temps)
-
+#target_compile_options( ex2_occupancy PUBLIC -Rpass-analysis=kernel-resource-usage )
