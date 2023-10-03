@@ -30,15 +30,18 @@ of occupancy via kernel launches and the HIP API.
 
 - Write a vector-addition kernel and verify the results on the host.
 
-- Use the HIP API to get the kernel's occupancy given for a given
-  LDS usage, problem size, and thread-block size.
+- Use the HIP API to get the kernel's occupancy given for a given LDS
+  usage, problem size, and thread-block size.  Relevant API function:
+  hipOccupancyMaxActiveBlocksPerMultiprocessor
 
 - Use the HIP API to get the optimal thread-block and grid-block
-  parameters for maximizing occupancy.
+  parameters for maximizing occupancy.  Relevant API function:
+  hipOccupancyMaxPotentialBlockSize
 
 - Use the HIP API to determine the maximum allowable thread block
   size.  What happens when you ask for more than the maximum allowable
-  threads per block?  (What should happen?)
+  threads per block?  (What should happen?)  Relevant API function:
+  hipDeviceGetAttribute with enum hipDeviceAttributeMaxBlockDimX
 
 - Set the launch bounds for the kernel.  What happens when you launch
   the kernel with a different number of threads per block?  (What
