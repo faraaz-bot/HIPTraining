@@ -17,16 +17,6 @@ intT1 ceildiv(const intT1 numerator, const intT2 divisor)
     return (numerator + divisor - 1) / divisor;
 }
 
-__global__
-//__launch_bounds__(512, 0)
-void vecAdd(float * const a, const float * const  b, const int N)
-{
-    // Solution
-    {
-        
-    }
-}
-
 int main(int argc, char *argv[])
 {
     // Command-line specified arguments

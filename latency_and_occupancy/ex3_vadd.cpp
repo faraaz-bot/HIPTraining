@@ -17,22 +17,13 @@ intT1 ceildiv(const intT1 numerator, const intT2 divisor)
     return (numerator + divisor - 1) / divisor;
 }
 
-__global__
-void vecAdd(float * const a, const float * const  b, const int N)
-{
-    // Solution
-    {
-
-    }
-}
-
 int main(int argc, char *argv[])
 {
     // Command-line specified arguments
     int N;
     int lds_bytes;
     int blockSize;
-    
+
     po::options_description opdesc("rocfft rider command line options");
     opdesc.add_options()("h", "produces this help message")
         ("N", po::value<int>(&N)->default_value(1), "Problem size")
@@ -41,7 +32,6 @@ int main(int argc, char *argv[])
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, opdesc), vm);
     po::notify(vm);
-    
     if(vm.count("h"))
     {
         std::cout << opdesc << std::endl;
@@ -56,7 +46,6 @@ int main(int argc, char *argv[])
 
     // Solution:
     {
-    
 
     }
     
