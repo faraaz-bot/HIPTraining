@@ -68,6 +68,7 @@
 // 3. Write a solution to our problem using DPP.
 // 4. Write a solution to our problem using BPermute.
 // 5. Evaluate the performance of each solution.
+// 6. Run each of your solutions and observe their performance.
 //
 // Supported Architecture:
 // All of the __builtin instructions in Wave64 in this exercise are supported on:
