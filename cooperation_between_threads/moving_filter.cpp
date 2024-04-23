@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
+#include <sstream>
 #include <fstream>
 #include <vector>
 #include <hip/hip_runtime.h>
@@ -26,11 +27,14 @@ void loadData(std::string file, std::vector<float> &data)
 void writeData(std::string file, std::vector<float> &data)
 {
     std::ofstream myFile;
+    std::stringstream outputBuffer;
+
     myFile.open(file);
     for(int i = 0; i < data.size(); i++)
     {
-        myFile << data[i] << std::endl;
+        outputBuffer << data[i] << '\n';
     }
+    myFile << outputBuffer.str() << std::flush;
     myFile.close();
 }
 
