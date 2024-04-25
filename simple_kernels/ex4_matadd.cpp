@@ -70,13 +70,21 @@ int main()
     fillMatrix(valb, N, M);
     showMatrix(valb, N, M);
 
+    std::vector<float> valout(vala.size());
+    
     // Solution
     {
         // Put your solution here.
     }
 
-    std::cout << "output:\n";
-    showMatrix(vala, N, M);
+    float maxerr = 0.0;
+    for(int i = 0; i < valout.size(); ++i) {
+        float diff = std::abs(vala[i] + valb[i] - valout[i]);
+        if(diff > maxerr)
+            maxerr = diff;
+    }
+    std::cout << "max error: " << maxerr << "\n";
+
     
     return 0;
 }

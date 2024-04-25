@@ -31,51 +31,39 @@ Or normal clang or g++, which will call nvcc for the hip code:
 cmake -DCMAKE_CXX_COMPILER=clang ..
 
 
+# Compile with make:
+export MAKEFLAGS=-j$(nproc)
+make
+
+
 ## Exercises:
 
+# Exercise 1:
+Determine the error-handling behaviour for the HIP runtime by:
+- failing an allocation on the device
+- failing a kernel launch
 
-# Exercise 1: errors on purpose!
+# Exercise 2: Vector addition kernel
 
-This exercise is about errors and handling them.  The first is
-catching a runtime error; try allocating a ridiculously large amount
-of memory, and detect the error code.  The second is to create a kernel
-that segfaults and detect the error in the kernel launch.
+Compute the sum of two vectors of arbitrary length for general
+thread-block sizes. Verify the result by comparing with a CPU-based
+computation.
 
+# Exercise 3: Vector addition kernel more ops per thread
 
-# Exercise 2: vector addition with one thread-block.
+Compute the sum of two vectors of arbitrary length for general
+thread-block sizes by having each thread compute 4 terms.  Organize the
+threads in two ways:
+ - by having each thread treat 4 contiguous terms.  For example, thread 0
+ computes terms {0, 1, 2, 3}, thread 1 computes terms {5, 6, 7, 8}, etc.
+  - by having contiguous threads treat contiguous terms.  For example,
+ thread 0 computes terms {0, N/4, 2N/4, 3N/4}, and thread 1 computes
+ terms {1, N/4 + 1, 2N/4 + 1, 3N/4 + 1}, etc.
 
-Compute a += b for a and b vectors of length N <= 1024.  In this case
-we can use 1 thread per element, and since N<= 1024, we can just use
-on thread-block.
+Verify the result by comparing with a CPU-based computation.
 
+# Exercise 4:
+Matrix addition kernel - 1 thread per element using 2D grid of 2D thread blocks
 
-# Exercise 3: vector addition with multiple thread-block.
-
-Same as in exercise 2, but now we have N > 1024, and need multiple
-thread-blocks.  N is not necessarily divisible by the block size, so
-make sure to include a thread-guard.
-
-
-# Exercise 4: vector addition with multiple elements per thread.
-
-Since the element-wise operation is quite simple and quick, it can be
-faster to have each thread treat more than one element by adding a loop
-in the kernel itself.  In this exersize, have each thread treat, say, 4
-contiguous elements.  That is, thread 0 computes a[0], a[1], a[2], and a[3];
-thread 1 computesa[4], a[5], a[6], and a[7]; etc.
-
-
-# Exercise 5: multiple elements per thread with contiguous reads
-
-In exercise 4, each thread read contiguous elements; one can get
-better performance by having contiguous threads read contiguous data.
-Suppose that T threads are launched in total.  In this exercise,
-modify the solution to exercise 4 so that thread 0 computes a[0],
-a[T], a[2T], and a[3T]; thread 1 computes a[1], a[T + 1], a[2T + 1],
-and a[3T + 1], etc.
-
-
-# Exercise 6: Matrix addition kernel.
-
-Given matrices A and B, compute A+B using a 2D grid for general matrix
-dimensions.
+- Use a 2D thread organization to perform a matrix addition.  Verify the
+result by comparing with a CPU-based computation.

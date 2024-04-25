@@ -40,9 +40,7 @@ set( example_list
   ex1_errors
   ex2_vadd
   ex3_vadd4by
-  ex4_matadd
-  ex5_vaddgrid
-  ex6_matadd )
+  ex4_matadd )
 
 foreach( example ${example_list} )
   add_executable( ${example}  ${example}.cpp )

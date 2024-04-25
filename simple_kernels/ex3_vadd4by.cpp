@@ -16,13 +16,22 @@ intT1 ceildiv(const intT1 numerator, const intT2 divisor)
     return (numerator + divisor - 1) / divisor;
 }
 
-__global__ void vecAddBlock(float* a, const float* b, const int N, const int batch)
+__global__ void vecAddcont(float* a, const float* b, const int N, const int batch)
 {
     // Solution
     {
         // Put your solution here.
     }
 }
+
+__global__ void vecAddskip(float* a, const float* b, const int N, const int batch)
+{
+    // Solution
+    {
+        // Put your solution here.
+    }
+}
+
 
 int main()
 {
@@ -49,14 +58,20 @@ int main()
         valb[i] = i; // or whatever you want to fill it with
     }
 
+    std::vector<float> valout(N, 0.0);
+    
     // Solution
     {
         // Put your solution here.
     }
-
-    for(const auto& val: vala)
-        std::cout << val << " ";
-    std::cout << "\n";
     
+    float maxerr = 0.0;
+    for(int i = 0; i < valout.size(); ++i) {
+        float diff = std::abs(vala[i] + valb[i] - valout[i]);
+        if(diff > maxerr)
+            maxerr = diff;
+    }
+    std::cout << "max error: " << maxerr << "\n";
+
     return 0;
 }
