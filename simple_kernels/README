@@ -3,29 +3,32 @@
 # Set up your cmake environment to detect ROCm:
 export CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/rocm/lib/cmake/
 
-# Make build directory and cd into it:
-mkdir build && cd build
-
-# Configure hipcc:
-cmake -DCMAKE_CXX_COMPILER=hipcc ..
-
-# Configure amd-clang:
-cmake -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++ \
-   -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/amdclang++  ..
-
-# Configure hipcc-nvcc
-Upgrade to a later cmake (something like 3.24 or later; may need to
+Upgrade to a later cmake (something like 3.21 or later; may need to
 install libssl-dev on ubuntu).
 Grab the source files, and then build and install with:
 cmake -DCMAKE_INSTALL_PREFIX=${HOME}/cmake .. && make && make install
 export PATH=${HOME}/cmake/bin:${PATH}
 
+# ROCm-backend configuration:
+
+cmake -DCMAKE_CXX_COMPILER=amdclang++ ..
+
+One can also use hipcc instead of amdclang++, though hipcc is in the
+process of being deprecated.
+
+
+# CUDA-backend configuration:
+
+Specify nvidia platform support:
 export HIP_PLATFORM=nvidia
+
+cmake -DCMAKE_CXX_COMPILER=nvcc ..
+
+You can also use hipcc, which wraps nvcc:
 cmake -DCMAKE_CXX_COMPILER=hipcc ..
 
-# Compile with make:
-export MAKEFLAGS=-j$(nproc)
-make
+Or normal clang or g++, which will call nvcc for the hip code:
+cmake -DCMAKE_CXX_COMPILER=clang ..
 
 
 ## Exercises:
