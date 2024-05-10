@@ -20,9 +20,9 @@
 # THE SOFTWARE.
 # #############################################################################
 
-cmake_minimum_required( VERSION 3.21 )
+cmake_minimum_required( VERSION 3.16 )
 
-project( hip_simple_kernels LANGUAGES CXX HIP )
+project( hip_simple_kernels LANGUAGES CXX )
 
 set( CMAKE_CXX_STANDARD 14 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
@@ -30,11 +30,13 @@ set( CMAKE_CXX_EXTENSIONS OFF )
 
 if( $ENV{HIP_PLATFORM} MATCHES "nvidia" )
   message( STATUS "HIP_PLATFORM: nvidia" )
+  add_compile_definitions( __HIP_PLATFORM_NVIDIA__ )
+  find_package( CUDAToolkit REQUIRED )
 else()
   message( STATUS "HIP_PLATFORM: amd" )
 endif()
 
-find_package( hip REQUIRED )
+find_package( HIP REQUIRED )
 
 set( example_list
   ex1_errors
@@ -42,14 +44,9 @@ set( example_list
   ex3_vadd4by
   ex4_matadd )
 
-foreach( example ${example_list} )
-  add_executable( ${example}  ${example}.cpp )
-  
-  # Since the files don't end in .hip (or .cu), we need to tell the
-  # compiler that it should look for GPU kernels.
-  set_source_files_properties(${example}.cpp PROPERTIES LANGUAGE HIP)
-
+  foreach( example ${example_list} )
+  add_executable( ${example} ${example}.cpp )
   if( NOT CMAKE_CXX_COMPILER MATCHES ".*hipcc")
     target_link_libraries( ${example} hip::device hip::host )
-  endif()
+   endif()
 endforeach()
