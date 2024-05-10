@@ -3,22 +3,33 @@ FLAGS=-O3 -std=c++14
 INC=-I/opt/rocm/include
 LIB=-lroctx64
 
-default: ex1 ex2
+dir_guard=@mkdir -p $(@D)
 
-car.o: car.cpp car.hpp
-	$(CXX) $(FLAGS) -c car.cpp $(INC)
+default: build/ex1 build/ex2
 
-ex1.o: ex1.cpp
-	$(CXX) $(FLAGS) -c ex1.cpp $(INC)
+build/car1.o: car1.cpp car.hpp
+	$(dir_guard)
+	$(CXX) $(FLAGS) -o build/car1.o -c car1.cpp $(INC)
 
-ex1: ex1.o car.o
-	$(CXX) $(FLAGS) -o ex1 ex1.o car.o $(LIB)
+build/car2.o: car2.cpp car.hpp
+	$(dir_guard)
+	$(CXX) $(FLAGS) -o build/car2.o -c car2.cpp $(INC)
 
-ex2.o: ex2.cpp
-	$(CXX) $(FLAGS) -c ex2.cpp $(INC)
+build/ex1.o: ex1.cpp
+	$(dir_guard)
+	$(CXX) $(FLAGS) -o build/ex1.o -c ex1.cpp $(INC)
 
-ex2: car.o ex2.o car.o
-	$(CXX) $(FLAGS) -o ex2 ex2.o car.o $(LIB)
+build/ex1: build/ex1.o build/car1.o
+	$(dir_guard)
+	$(CXX) $(FLAGS) -o build/ex1 build/ex1.o build/car1.o $(LIB)
+
+build/ex2.o: ex2.cpp
+	$(dir_guard)
+	$(CXX) $(FLAGS) -o build/ex2.o -c ex2.cpp $(INC)
+
+build/ex2: build/ex2.o build/car2.o
+	$(dir_guard)
+	$(CXX) $(FLAGS) -o build/ex2 build/ex2.o build/car2.o $(LIB)
 
 clean:
-	rm -rf *.o ex1 ex2
+	@rm -rf build/*.o build/ex1 build/ex2

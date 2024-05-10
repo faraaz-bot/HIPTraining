@@ -1,5 +1,4 @@
 #include <hip/hip_runtime.h>
-#include <hip/hip_runtime_api.h>
 #include <malloc.h>
 using namespace std;
 

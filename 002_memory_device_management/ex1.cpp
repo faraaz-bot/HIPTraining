@@ -1,5 +1,4 @@
 #include <hip/hip_runtime.h>
-#include <hip/hip_runtime_api.h>
 
 int main() {
   // Query device count using HIP API and print result

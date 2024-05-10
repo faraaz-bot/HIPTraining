@@ -1,6 +1,6 @@
 #pragma once
 
-#include <hip/hip_runtime_api.h>
+#include <hip/hip_runtime.h>
 
 // Struct to hold car info
 struct Car
