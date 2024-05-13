@@ -62,9 +62,9 @@
 // D = alpha * (A x B) + beta * C
 //
 // In this simplified example, we assume:
-// : A matrix is in row-major format       (M x K)
+// : A matrix is in col-major format       (M x K)
 // : B matrix is in row-major format       (K x N)
-// : C, D matrices are in row-major format (M x N)
+// : C, D matrices are in col-major format (M x N)
 // : C == D in size, data-type and layout
 // : No LDS required
 //
@@ -82,7 +82,7 @@
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 
-#include "../common.hpp"
+#include "common.hpp"
 
 ///////////////
 /// Helpers ///
@@ -170,10 +170,10 @@ __device__ AccumFragT mfma_f32_16x16x16f16(AFragT aFrag, BFragT bFrag, AccumFrag
 // Size: (BLOCK_M x BLOCK_K)
 // ASSUMPTION:
 // - We want contiguous BLOCK_M sized column neighbors in register.
-// - Data is in row_major format
+// - Data is in col_major format
 // This means:
 // - From A we will load K columns of size BLOCK_M to satisfy our input data
-__device__ AFragT load_A_16x16_row_major(float16_t const* input, int ld)
+__device__ AFragT load_A_16x16_col_major(float16_t const* input, int ld)
 {
     // Here we want to load a 16x16 block of data.
     // Register Mapping:
@@ -196,23 +196,22 @@ __device__ AFragT load_A_16x16_row_major(float16_t const* input, int ld)
                                        (threadIdx.x / Dim) * VW); // Col
     auto stepCoord2D = std::make_pair(0u, 1u);
 
-    // Flatten to 1D row_major offsets.
-    auto row_major = [](auto const& coord, auto ld) { return coord.first * ld + coord.second; };
+    // Flatten to 1D col_major offsets.
+    auto col_major = [](auto const& coord, auto ld) { return coord.first + coord.second * ld; };
 
-    auto startOffset = row_major(startCoord2D, ld);
-    auto kOffset = row_major(stepCoord2D, ld);
+    auto startOffset = col_major(startCoord2D, ld);
+    auto kOffset = col_major(stepCoord2D, ld);
 
-    // If you notice carefully, kOffset == 1.
-    // This means the following is vector load of 4 contiguous elements.
-    // When you check out the assembly, the compiler will convert the 
-    // following into a single global_load_dwordx2 (woohoo!)
-    auto fragA = *((AFragT*)(input + startOffset));
-
-    // Reference:
-    //     input[startOffset],               // v[0] = Reg 0 [0:15]
-    //     input[startOffset + kOffset],     // v[1] = Reg 0 [16:31]
-    //     input[startOffset + 2 * kOffset], // v[2] = Reg 1 [0:15]
-    //     input[startOffset + 3 * kOffset], // v[3] = Reg 1 [16:31]
+    // If you notice carefully, kOffset != 1.
+    // This means the following is vector is loaded with 4 non-contiguous offsets,
+    // which the compiler will separate into 4 different global_load_short instructions.
+    auto fragA = AFragT
+    {
+        input[startOffset],               // v[0] = Reg 0 [0:15]
+        input[startOffset + kOffset],     // v[1] = Reg 0 [16:31]
+        input[startOffset + 2 * kOffset], // v[2] = Reg 1 [0:15]
+        input[startOffset + 3 * kOffset], // v[3] = Reg 1 [16:31]
+    };
 
     return fragA;
 }
@@ -271,10 +270,10 @@ __device__ BFragT load_B_16x16_row_major(float16_t const* input, int ld)
 // Size: (BLOCK_M x BLOCK_N)
 // ASSUMPTION:
 // - We want contiguous BLOCK_N sized row neighbors in register.
-// - Data is in row_major format
+// - Data is in col_major format
 // This means:
 // - From C we will load BLOCK_M rows of size BLOCK_N to satisfy our input data
-__device__ CFragT load_C_16x16_row_major(float32_t const* input, int ld)
+__device__ CFragT load_C_16x16_col_major(float32_t const* input, int ld)
 {
     // Here we want to load a 16x16 block of data.
     // Register Mapping:
@@ -297,27 +296,30 @@ __device__ CFragT load_C_16x16_row_major(float32_t const* input, int ld)
                                         threadIdx.x % Dim);      // Col
     auto stepCoord2D = std::make_pair(1u, 0u);
 
-    // Flatten to 1D row_major offsets.
-    auto row_major = [](auto const& coord, auto ld) { return coord.first * ld + coord.second; };
+    // Flatten to 1D col_major offsets.
+    auto col_major = [](auto const& coord, auto ld) { return coord.first + coord.second * ld; };
 
-    auto startOffset = row_major(startCoord2D, ld);
-    auto kOffset = row_major(stepCoord2D, ld);
+    auto startOffset = col_major(startCoord2D, ld);
+    auto kOffset = col_major(stepCoord2D, ld);
 
-    // If you notice carefully, kOffset != 1.
-    // This means the following is vector is loaded with 4 non-contiguous offsets,
-    // which the compiler will separate into 4 different global_load_dword instructions.
-    auto fragC = CFragT 
-    {
-        input[startOffset],               // v[0] = Reg 0
-        input[startOffset + kOffset],     // v[1] = Reg 1
-        input[startOffset + 2 * kOffset], // v[2] = Reg 2
-        input[startOffset + 3 * kOffset], // v[3] = Reg 3
-    };
+    // If you notice carefully, kOffset == 1.
+    // This means the following is vector load of 4 contiguous elements.
+    // When you check out the assembly, the compiler will convert the 
+    // following into a single global_load_dwordx4 (woohoo!)
+    auto fragC = *((CFragT*)(input + startOffset));
+
+    // Reference:
+    // {
+    //     input[startOffset],               // v[0] = Reg 0
+    //     input[startOffset + kOffset],     // v[1] = Reg 1
+    //     input[startOffset + 2 * kOffset], // v[2] = Reg 2
+    //     input[startOffset + 3 * kOffset], // v[3] = Reg 3
+    // };
 
     return fragC;
 }
 
-__device__ void store_C_16x16_row_major(float32_t* output, CFragT cFrag, int ld)
+__device__ void store_C_16x16_col_major(float32_t* output, CFragT cFrag, int ld)
 {
     // Here we want to store a 16x16 block of data.
     // Register Mapping:
@@ -340,19 +342,23 @@ __device__ void store_C_16x16_row_major(float32_t* output, CFragT cFrag, int ld)
                                         threadIdx.x % Dim);      // Col
     auto stepCoord2D = std::make_pair(1u, 0u);
 
-    // Flatten to 1D row_major offsets.
-    auto row_major = [](auto const& coord, auto ld) { return coord.first * ld + coord.second; };
+    // Flatten to 1D col_major offsets.
+    auto col_major = [](auto const& coord, auto ld) { return coord.first + coord.second * ld; };
 
-    auto startOffset = row_major(startCoord2D, ld);
-    auto kOffset = row_major(stepCoord2D, ld);
+    auto startOffset = col_major(startCoord2D, ld);
+    auto kOffset = col_major(stepCoord2D, ld);
 
-    // If you notice carefully, kOffset != 1.
-    // This means the following is vector is loaded with 4 non-contiguous offsets,
-    // which the compiler will separate into 4 different global_store_dword instructions.
-    output[startOffset] = cFrag[0];               // v[0] = Reg 0
-    output[startOffset + kOffset] = cFrag[1];     // v[1] = Reg 1
-    output[startOffset + 2 * kOffset] = cFrag[2]; // v[2] = Reg 2
-    output[startOffset + 3 * kOffset] = cFrag[3]; // v[3] = Reg 3
+    // If you notice carefully, kOffset == 1.
+    // This means the following is vector store of 4 contiguous elements.
+    // When you check out the assembly, the compiler will convert the 
+    // following into a single global_store_dwordx4 (woohoo!)
+    *((CFragT*)(output + startOffset)) = cFrag;
+
+    // Reference:
+    // output[startOffset] = cFrag[0];               // v[0] = Reg 0
+    // output[startOffset + kOffset] = cFrag[1];     // v[1] = Reg 1
+    // output[startOffset + 2 * kOffset] = cFrag[2]; // v[2] = Reg 2
+    // output[startOffset + 3 * kOffset] = cFrag[3]; // v[3] = Reg 3
 }
 
 __global__ void sgemm_example_d(uint32_t     m,
@@ -395,9 +401,9 @@ __global__ void sgemm_example_d(uint32_t     m,
         {
             // Load the inputs.
             // Flatten 2D coord (row, col) into 1D, knowing:
-            // A = row major, BLOCK_M x BLOCK_K
+            // A = col major, BLOCK_M x BLOCK_K
             // B = row major, BLOCK_K x BLOCK_N
-            fragA = load_A_16x16_row_major(a + (cRow * lda + i), lda);
+            fragA = load_A_16x16_col_major(a + (cRow  + i * lda), lda);
             fragB = load_B_16x16_row_major(b + (i * ldb + cCol), ldb);
 
             // Matrix multiply-accumulate using MFMA units
@@ -409,7 +415,7 @@ __global__ void sgemm_example_d(uint32_t     m,
         /// Step 2: Bilinear element-wise mult
         ///  D = alpha * A x B + beta * C
         ///
-        auto fragC = load_C_16x16_row_major(c + (cRow * ldc + cCol), ldc);
+        auto fragC = load_C_16x16_col_major(c + (cRow + cCol * ldc), ldc);
 
         for(int i = 0; i < vectorSize(fragC); ++i)
         {
@@ -419,7 +425,7 @@ __global__ void sgemm_example_d(uint32_t     m,
         ///
         /// Step3: Store final block result
         ///
-        store_C_16x16_row_major(d + (cRow * ldd + cCol ), fragC, ldd);
+        store_C_16x16_col_major(d + (cRow  + cCol * ldd), fragC, ldd);
     }
 }
 
@@ -436,10 +442,10 @@ __host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float32_t alpha, flo
     }
 
     // Leading dimensions
-    int lda = k;   // row_major
+    int lda = m;   // col_major
     int ldb = n;   // row_major
-    int ldc = n;   // row_major
-    int ldd = ldc; // row_major
+    int ldc = m;   // col_major
+    int ldd = ldc; // col_major
 
     std::cout << "Initializing host data..." << std::endl;
 
@@ -547,7 +553,7 @@ __host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float32_t alpha, flo
 
     // Setup and run reference computation
     std::vector<float32_t> matrixD_ref(m * n, std::numeric_limits<float>::signaling_NaN());
-    gemm_cpu_h<float16_t, float32_t, float32_t, row_major, row_major, row_major>(m,
+    gemm_cpu_h<float16_t, float32_t, float32_t, col_major, row_major, col_major>(m,
                                                                     n,
                                                                     k,
                                                                     matrixA.data(),
@@ -563,9 +569,9 @@ __host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float32_t alpha, flo
 
 #if !NDEBUG
     std::cout << "Matrix D Reference:" << std::endl;
-    print<float32_t, row_major>(matrixD_ref.data(), m, n);
+    print<float32_t, col_major>(matrixD_ref.data(), m, n);
     std::cout << "Matrix D Result:" << std::endl;
-    print<float32_t, row_major>(matrixD.data(), m, n);
+    print<float32_t, col_major>(matrixD.data(), m, n);
 #endif // !NDEBUG
 
     auto res = compareEqual(matrixD.data(), matrixD_ref.data(), m * n);

@@ -36,4 +36,4 @@ Repeat exercise 2 (multithread) using the reversed summation. Explain the new re
 
 ## Notes
 
-You have been provided with template files ex1_single_thread_template.cpp and ex2_multithread_template.cpp. Feel free to use these as a baseline in the exercise, or start from scratch yourself.
+You have been provided with template files **ex1_single_thread.cpp** and **ex2_multithread.cpp**. Feel free to use these as a baseline in the exercise, or start from scratch yourself.

@@ -82,7 +82,7 @@
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 
-#include "../common.hpp"
+#include "common.hpp"
 
 ///////////////
 /// Helpers ///
@@ -138,7 +138,11 @@ const int T_BLOCK_Y = 1;
 // block sizes:
 const int BLOCK_M = 16;
 const int BLOCK_N = 16;
-const int BLOCK_K = 4;
+const int BLOCK_K = 16;
+
+// Types used in this exercise
+using float16_t = _Float16;
+using float32_t = float;
 
 // Define some fragment types that match our measurements:
 // A = BLOCK_M * BLOCK_K elements
@@ -146,21 +150,20 @@ const int BLOCK_K = 4;
 // C = BLOCK_M * BLOCK_N elements
 // Note: using our WAVE perspective, this is the number of 
 // vector registers REQUIRED to hold this much data.
-// Check: for block dimensions of 16 x 16 x 4
-// A should be a vector size of 1
-// B should be a vector size of 1
+// Check: for block dimensions of 16 x 16 x 16
+// A should be a vector size of 4
+// B should be a vector size of 4
 // C should be a vector size of 4
-using AFragT = VecT<float, BLOCK_M * BLOCK_K / WAVE_SIZE>;
-using BFragT = VecT<float, BLOCK_N * BLOCK_K / WAVE_SIZE>;
-using AccumFragT = VecT<float, BLOCK_M * BLOCK_N / WAVE_SIZE>;
+using AFragT = VecT<float16_t, BLOCK_M * BLOCK_K / WAVE_SIZE>;
+using BFragT = VecT<float16_t, BLOCK_N * BLOCK_K / WAVE_SIZE>;
+using AccumFragT = VecT<float32_t, BLOCK_M * BLOCK_N / WAVE_SIZE>;
 using CFragT = AccumFragT;
 
 // This MFMA builtin represents the multiply-accumulate function
 // for each K-step of the the above block dimensions.
-__device__ AccumFragT mfma_16x16x4_f32(AFragT aFrag, BFragT bFrag, AccumFragT accumFrag)
+__device__ AccumFragT mfma_f32_16x16x16f16(AFragT aFrag, BFragT bFrag, AccumFragT accumFrag)
 {
-    // Nit: builtin appears to prefer scalar instead of vector[1]
-    return __builtin_amdgcn_mfma_f32_16x16x4f32(aFrag[0], bFrag[0], accumFrag, 0, 0, 0);
+    return __builtin_amdgcn_mfma_f32_16x16x16f16(aFrag, bFrag, accumFrag, 0, 0, 0);
 }
 
 // Define a load function for input A blocks:
@@ -168,27 +171,49 @@ __device__ AccumFragT mfma_16x16x4_f32(AFragT aFrag, BFragT bFrag, AccumFragT ac
 // ASSUMPTION:
 // - We want contiguous BLOCK_M sized column neighbors in register.
 // - Data is in col_major format
-// - Vector width is 1
 // This means:
 // - From A we will load K columns of size BLOCK_M to satisfy our input data
-__device__ AFragT load_A_16x4_col_major(float const* input, int ld)
+__device__ AFragT load_A_16x16_col_major(float16_t const* input, int ld)
 {
-    // Here we want to load a 16x4 block of data.
+    // Here we want to load a 16x16 block of data.
     // Register Mapping:
 
-    // Size              |   BLOCK_M  |   BLOCK_M   |   BLOCK_M   |   BLOCK_M    |
-    // Register Element  | 0  ...  15 | 16  ...  31 | 32  ...  47 | 48  ...   63 |
+    // Size              |   BLOCK_M  |   BLOCK_M   |   BLOCK_M   |   BLOCK_M    |  Vector
+    // Register Element  | 0  ...  15 | 16  ...  31 | 32  ...  47 | 48  ...   63 |  Element
     //                    ____________ _____________ _____________ ______________
-    // Reg 0             |     K0     |     K1      |     K2      |     K3       |
+    // Reg 0 [0 :15]     |     K0     |     K4      |     K8      |     K12      |  v[0]
+    // Reg 0 [16:31]     |     K1     |     K5      |     K9      |     K13      |  v[1]
+    // Reg 1 [0 :15]     |     K2     |     K6      |     K10     |     K14      |  v[2]
+    // Reg 1 [16:31]     |     K3     |     K7      |     K11     |     K15      |  v[3]
 
     static constexpr uint32_t VW = vectorSize(AFragT{});
     static constexpr uint32_t Dim = BLOCK_M;
 
-    // How would this offset change for a in a different data layout?
-    auto indexOffset = threadIdx.x * VW % Dim;
-    auto kOffset = threadIdx.x * VW / Dim * ld;
-    auto const* fragPtr = (AFragT const*)(input + kOffset + indexOffset);
-    return *fragPtr;
+    // To start the loading process, let's visualize in 2D coords.
+    // Each thread will load 4 elements.
+    // We need to know where they start, and where the next elements are.
+    auto startCoord2D = std::make_pair(threadIdx.x % Dim,         // Row
+                                       (threadIdx.x / Dim) * VW); // Col
+    auto stepCoord2D = std::make_pair(0u, 1u);
+
+    // Flatten to 1D col_major offsets.
+    auto col_major = [](auto const& coord, auto ld) { return coord.first + coord.second * ld; };
+
+    auto startOffset = col_major(startCoord2D, ld);
+    auto kOffset = col_major(stepCoord2D, ld);
+
+    // If you notice carefully, kOffset != 1.
+    // This means the following is vector is loaded with 4 non-contiguous offsets,
+    // which the compiler will separate into 4 different global_load_short instructions.
+    auto fragA = AFragT
+    {
+        input[startOffset],               // v[0] = Reg 0 [0:15]
+        input[startOffset + kOffset],     // v[1] = Reg 0 [16:31]
+        input[startOffset + 2 * kOffset], // v[2] = Reg 1 [0:15]
+        input[startOffset + 3 * kOffset], // v[3] = Reg 1 [16:31]
+    };
+
+    return fragA;
 }
 
 // Define a load function for input B blocks:
@@ -196,96 +221,159 @@ __device__ AFragT load_A_16x4_col_major(float const* input, int ld)
 // ASSUMPTION:
 // - We want contiguous BLOCK_N sized row neighbors in register.
 // - Data is in row_major format
-// - Vector width is 1
 // This means:
 // - From B we will load K rows of size BLOCK_N to satisfy our input data
-__device__ BFragT load_B_16x4_row_major(float const* input, int ld)
+__device__ BFragT load_B_16x16_row_major(float16_t const* input, int ld)
 {
-    // Here we want to load a 16x4 block of data.
+    // Here we want to load a 16x16 block of data.
     // Register Mapping:
 
-    // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N   |   BLOCK_N    |
-    // Register Element  | 0  ...  15 | 16  ...  31 | 32  ...  47 | 48  ...   63 |
+    // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N   |   BLOCK_N    |  Vector
+    // Register Element  | 0  ...  15 | 16  ...  31 | 32  ...  47 | 48  ...   63 |  Element
     //                    ____________ _____________ _____________ ______________
-    // Reg0              |     K0     |     K1      |     K2      |     K3       |
+    // Reg 0 [0 :15]     |     K0     |     K4      |     K8      |     K12      |  v[0]
+    // Reg 0 [16:31]     |     K1     |     K5      |     K9      |     K13      |  v[1]
+    // Reg 1 [0 :15]     |     K2     |     K6      |     K10     |     K14      |  v[2]
+    // Reg 1 [16:31]     |     K3     |     K7      |     K11     |     K15      |  v[3]
 
     static constexpr uint32_t VW = vectorSize(BFragT{});
     static constexpr uint32_t Dim = BLOCK_N;
 
-    // How would this offset change for b in a different data layout?
-    auto indexOffset = threadIdx.x * VW % Dim;
-    auto kOffset = threadIdx.x * VW / Dim * ld;
-    auto const* fragPtr = (BFragT const*)(input + kOffset + indexOffset);
-    return *fragPtr;
+    // To start the loading process, let's visualize in 2D coords.
+    // Each thread will load 4 elements.
+    // We need to know where they start, and where the next elements are.
+    auto startCoord2D = std::make_pair((threadIdx.x / Dim) * VW, // Row
+                                        threadIdx.x % Dim);      // Col
+    auto stepCoord2D = std::make_pair(1u, 0u);
+
+    // Flatten to 1D row_major offsets.
+    auto row_major = [](auto const& coord, auto ld) { return coord.first * ld + coord.second; };
+
+    auto startOffset = row_major(startCoord2D, ld);
+    auto kOffset = row_major(stepCoord2D, ld);
+
+    // If you notice carefully, kOffset != 1.
+    // This means the following is vector is loaded with 4 non-contiguous offsets,
+    // which the compiler will separate into 4 different global_load_short instructions.
+    auto fragB = BFragT
+    {
+        input[startOffset],               // v[0] = Reg 0 [0:15]
+        input[startOffset + kOffset],     // v[1] = Reg 0 [16:31]
+        input[startOffset + 2 * kOffset], // v[2] = Reg 1 [0:15]
+        input[startOffset + 3 * kOffset], // v[3] = Reg 1 [16:31]
+    };
+
+    return fragB;
 }
 
 // Define a load & store function for C, which is in a slightly different layout.
 // Size: (BLOCK_M x BLOCK_N)
 // ASSUMPTION:
 // - We want contiguous BLOCK_N sized row neighbors in register.
-// - Data is in row_major format
-// - Vector width is 4
+// - Data is in col_major format
 // This means:
 // - From C we will load BLOCK_M rows of size BLOCK_N to satisfy our input data
-__device__ CFragT load_C_16x16_col_major(float const* input, int ld)
+__device__ CFragT load_C_16x16_col_major(float32_t const* input, int ld)
 {
     // Here we want to load a 16x16 block of data.
     // Register Mapping:
 
-    // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N   |   BLOCK_N    |
-    // Register Element  | 0  ...  15 | 16  ...  31 | 32  ...  47 | 48  ...   63 |
+    // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N   |   BLOCK_N    | Vector
+    // Register Element  | 0  ...  15 | 16  ...  31 | 32  ...  47 | 48  ...   63 | Element
     //                    ____________ _____________ _____________ ______________
-    // Reg0              |     M0     |     M4      |     M8      |     M12      |
-    // Reg1              |     M1     |     M5      |     M9      |     M13      |
-    // Reg2              |     M2     |     M6      |     M10     |     M14      |
-    // Reg3              |     M3     |     M7      |     M11     |     M15      |
+    // Reg0              |     M0     |     M4      |     M8      |     M12      | v[0]
+    // Reg1              |     M1     |     M5      |     M9      |     M13      | v[1]
+    // Reg2              |     M2     |     M6      |     M10     |     M14      | v[2]
+    // Reg3              |     M3     |     M7      |     M11     |     M15      | v[3]
 
     static constexpr uint32_t VW = vectorSize(CFragT{});
     static constexpr uint32_t Dim = BLOCK_N;
 
-    // How would this offset change for c in a different data layout?
-    auto indexOffset = threadIdx.x % Dim * ld;
-    auto mOffset = threadIdx.x / Dim * VW ;
-    auto* fragPtr = (CFragT*)(input + mOffset + indexOffset);
-    return *fragPtr;
+    // To start the loading process, let's visualize in 2D coords.
+    // Each thread will load 4 elements.
+    // We need to know where they start, and where the next elements are.
+    auto startCoord2D = std::make_pair((threadIdx.x / Dim) * VW, // Row
+                                        threadIdx.x % Dim);      // Col
+    auto stepCoord2D = std::make_pair(1u, 0u);
+
+    // Flatten to 1D col_major offsets.
+    auto col_major = [](auto const& coord, auto ld) { return coord.first + coord.second * ld; };
+
+    auto startOffset = col_major(startCoord2D, ld);
+    auto kOffset = col_major(stepCoord2D, ld);
+
+    // If you notice carefully, kOffset == 1.
+    // This means the following is vector load of 4 contiguous elements.
+    // When you check out the assembly, the compiler will convert the 
+    // following into a single global_load_dwordx4 (woohoo!)
+    auto fragC = *((CFragT*)(input + startOffset));
+
+    // Reference:
+    // {
+    //     input[startOffset],               // v[0] = Reg 0
+    //     input[startOffset + kOffset],     // v[1] = Reg 1
+    //     input[startOffset + 2 * kOffset], // v[2] = Reg 2
+    //     input[startOffset + 3 * kOffset], // v[3] = Reg 3
+    // };
+
+    return fragC;
 }
 
-__device__ void store_C_16x16_col_major(float* output, CFragT cFrag, int ld)
+__device__ void store_C_16x16_col_major(float32_t* output, CFragT cFrag, int ld)
 {
     // Here we want to store a 16x16 block of data.
     // Register Mapping:
 
-    // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N   |   BLOCK_N    |
-    // Register Element  | 0  ...  15 | 16  ...  31 | 32  ...  47 | 48  ...   63 |
+    // Size              |   BLOCK_N  |   BLOCK_N   |   BLOCK_N   |   BLOCK_N    | Vector
+    // Register Element  | 0  ...  15 | 16  ...  31 | 32  ...  47 | 48  ...   63 | Element
     //                    ____________ _____________ _____________ ______________
-    // Reg0              |     M0     |     M4      |     M8      |     M12      |
-    // Reg1              |     M1     |     M5      |     M9      |     M13      |
-    // Reg2              |     M2     |     M6      |     M10     |     M14      |
-    // Reg3              |     M3     |     M7      |     M11     |     M15      |
+    // Reg0              |     M0     |     M4      |     M8      |     M12      | v[0]
+    // Reg1              |     M1     |     M5      |     M9      |     M13      | v[1]
+    // Reg2              |     M2     |     M6      |     M10     |     M14      | v[2]
+    // Reg3              |     M3     |     M7      |     M11     |     M15      | v[3]
 
     static constexpr uint32_t VW = vectorSize(CFragT{});
     static constexpr uint32_t Dim = BLOCK_N;
 
-    // Why are the offsets the same for loading?
-    auto indexOffset = threadIdx.x % Dim * ld;
-    auto mOffset = threadIdx.x / Dim * VW;
-    auto* fragPtr = (CFragT*)(output + mOffset + indexOffset);
-    *fragPtr = cFrag;
+    // To start the loading process, let's visualize in 2D coords.
+    // Each thread will load 4 elements.
+    // We need to know where they start, and where the next elements are.
+    auto startCoord2D = std::make_pair((threadIdx.x / Dim) * VW, // Row
+                                        threadIdx.x % Dim);      // Col
+    auto stepCoord2D = std::make_pair(1u, 0u);
+
+    // Flatten to 1D col_major offsets.
+    auto col_major = [](auto const& coord, auto ld) { return coord.first + coord.second * ld; };
+
+    auto startOffset = col_major(startCoord2D, ld);
+    auto kOffset = col_major(stepCoord2D, ld);
+
+    // If you notice carefully, kOffset == 1.
+    // This means the following is vector store of 4 contiguous elements.
+    // When you check out the assembly, the compiler will convert the 
+    // following into a single global_store_dwordx4 (woohoo!)
+    *((CFragT*)(output + startOffset)) = cFrag;
+
+    // Reference:
+    // output[startOffset] = cFrag[0];               // v[0] = Reg 0
+    // output[startOffset + kOffset] = cFrag[1];     // v[1] = Reg 1
+    // output[startOffset + 2 * kOffset] = cFrag[2]; // v[2] = Reg 2
+    // output[startOffset + 3 * kOffset] = cFrag[3]; // v[3] = Reg 3
 }
 
 __global__ void sgemm_example_d(uint32_t     m,
                                 uint32_t     n,
                                 uint32_t     k,
-                                float const* a,
-                                float const* b,
-                                float const* c,
-                                float*       d,
+                                float16_t const* a,
+                                float16_t const* b,
+                                float32_t const* c,
+                                float32_t*       d,
                                 uint32_t     lda,
                                 uint32_t     ldb,
                                 uint32_t     ldc,
                                 uint32_t     ldd,
-                                float        alpha,
-                                float        beta)
+                                float32_t        alpha,
+                                float32_t        beta)
 {
     // Create frags
     auto fragA = AFragT{};
@@ -315,12 +403,12 @@ __global__ void sgemm_example_d(uint32_t     m,
             // Flatten 2D coord (row, col) into 1D, knowing:
             // A = col major, BLOCK_M x BLOCK_K
             // B = row major, BLOCK_K x BLOCK_N
-            fragA = load_A_16x4_col_major(a + (cRow  + i * lda), lda);
-            fragB = load_B_16x4_row_major(b + (i * ldb + cCol), ldb);
+            fragA = load_A_16x16_col_major(a + (cRow  + i * lda), lda);
+            fragB = load_B_16x16_row_major(b + (i * ldb + cCol), ldb);
 
             // Matrix multiply-accumulate using MFMA units
             // Accumulation intermediate = BLOCK_M x BLOCK_N
-            fragAcc = mfma_16x16x4_f32(fragA, fragB, fragAcc);
+            fragAcc = mfma_f32_16x16x16f16(fragA, fragB, fragAcc);
         }
 
         ///
@@ -341,7 +429,7 @@ __global__ void sgemm_example_d(uint32_t     m,
     }
 }
 
-__host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float alpha, float beta)
+__host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float32_t alpha, float32_t beta)
 {
     // Bounds check
     if((m < (BLOCK_M * T_BLOCK_X / WAVE_SIZE) 
@@ -362,11 +450,11 @@ __host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float alpha, float b
     std::cout << "Initializing host data..." << std::endl;
 
     // Initialize input matrices
-    std::vector<float> matrixA(m * k);
-    std::vector<float> matrixB(k * n);
-    std::vector<float> matrixC(m * n);
+    std::vector<float16_t> matrixA(m * k);
+    std::vector<float16_t> matrixB(k * n);
+    std::vector<float32_t> matrixC(m * n);
     // Fill outputs with NaN to catch contamination
-    std::vector<float> matrixD(m * n, std::numeric_limits<float>::signaling_NaN());
+    std::vector<float32_t> matrixD(m * n, std::numeric_limits<float32_t>::signaling_NaN());
 
     fillRand(matrixA.data(), m, k);
     fillRand(matrixB.data(), k, n);
@@ -382,15 +470,15 @@ __host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float alpha, float b
     std::cout << "Initializing device data..." << std::endl;
 
     // Allocate and copy device memory
-    float* d_a;
-    float* d_b;
-    float* d_c;
-    float* d_d;
+    float16_t* d_a;
+    float16_t* d_b;
+    float32_t* d_c;
+    float32_t* d_d;
 
-    const size_t bytesA = matrixA.size() * sizeof(float);
-    const size_t bytesB = matrixB.size() * sizeof(float);
-    const size_t bytesC = matrixC.size() * sizeof(float);
-    const size_t bytesD = matrixD.size() * sizeof(float);
+    const size_t bytesA = matrixA.size() * sizeof(float16_t);
+    const size_t bytesB = matrixB.size() * sizeof(float16_t);
+    const size_t bytesC = matrixC.size() * sizeof(float32_t);
+    const size_t bytesD = matrixD.size() * sizeof(float32_t);
 
     CHECK_HIP_ERROR(hipMalloc(&d_a, bytesA));
     CHECK_HIP_ERROR(hipMalloc(&d_b, bytesB));
@@ -464,8 +552,8 @@ __host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float alpha, float b
     CHECK_HIP_ERROR(hipMemcpy(matrixD.data(), d_d, bytesD, hipMemcpyDeviceToHost));
 
     // Setup and run reference computation
-    std::vector<float> matrixD_ref(m * n, std::numeric_limits<float>::signaling_NaN());
-    gemm_cpu_h<float, float, float, col_major, row_major, col_major>(m,
+    std::vector<float32_t> matrixD_ref(m * n, std::numeric_limits<float>::signaling_NaN());
+    gemm_cpu_h<float16_t, float32_t, float32_t, col_major, row_major, col_major>(m,
                                                                     n,
                                                                     k,
                                                                     matrixA.data(),
@@ -481,12 +569,12 @@ __host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float alpha, float b
 
 #if !NDEBUG
     std::cout << "Matrix D Reference:" << std::endl;
-    print<float, col_major>(matrixD_ref.data(), m, n);
+    print<float32_t, col_major>(matrixD_ref.data(), m, n);
     std::cout << "Matrix D Result:" << std::endl;
-    print<float, col_major>(matrixD.data(), m, n);
+    print<float32_t, col_major>(matrixD.data(), m, n);
 #endif // !NDEBUG
 
-    auto res = compareEqual<float>(matrixD.data(), matrixD_ref.data(), m * n);
+    auto res = compareEqual(matrixD.data(), matrixD_ref.data(), m * n);
 
     if(std::get<0>(res) == false)
     {
@@ -510,6 +598,6 @@ __host__ void gemm_test(uint32_t m, uint32_t n, uint32_t k, float alpha, float b
 
 int main()
 {
-    gemm_test(128, 128, 128, 2.1f, 2.1f);
+    gemm_test(16, 16, 32, 2.1f, 2.1f);
     return 0;
 }
