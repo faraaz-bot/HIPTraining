@@ -1,14 +1,13 @@
-Latency and Occupancy HIP Training Exercises
-
+# Latency and Occupancy HIP Training Exercises
 
 These exercises use Boost program options to parse command-line
 arguments.  On Ubunt, this is available in the
    libboost-program-options-dev
 package.  You can pass arguments via bash using the following notation,
 for example:
-
+```sh
   ./ex1_latency --N $(( 2 ** 20 ))
-
+```
 which sets N to be 2 to the power of 20.
 
 For exercise 2 HIP API calls, see
@@ -16,13 +15,13 @@ For exercise 2 HIP API calls, see
 https://docs.amd.com/projects/HIP/en/docs-5.0.0/doxygen/html/group___occupancy.html
 
 
-# Exercise 1: The empty kernel
+## Exercise 1: The empty kernel
 
 Measure empty kernel launch latency via the empty kernel; see how this
 is affected by the number of waves, threa-block size, and LDS use.
 
 
-# Exercise 2: Occupancy computation and measurement
+## Exercise 2: Occupancy computation and measurement
 
 We will use the simple vector-add kernel to explore the functionality
 of occupancy via kernel launches and the HIP API.
@@ -52,7 +51,7 @@ of occupancy via kernel launches and the HIP API.
 - Compile using `-Rpass-analysis=kernel-resource-usage` and observe
   the occupancy info at compile time!
 
-# Exercise 3: vector addition, but we add extra LDS to reduce occupancy
+## Exercise 3: vector addition, but we add extra LDS to reduce occupancy
 
 Using the results from exercise 2, determine the performance
 characteristics as a function of occupancy for the vector-add kernel.
