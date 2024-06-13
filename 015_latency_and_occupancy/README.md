@@ -12,7 +12,7 @@ which sets N to be 2 to the power of 20.
 
 For exercise 2 HIP API calls, see
 
-https://docs.amd.com/projects/HIP/en/docs-5.0.0/doxygen/html/group___occupancy.html
+https://rocm.docs.amd.com/projects/HIP/en/latest/doxygen/html/group___occupancy.html
 
 
 ## Exercise 1: The empty kernel
