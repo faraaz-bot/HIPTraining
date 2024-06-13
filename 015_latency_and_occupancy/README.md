@@ -18,7 +18,7 @@ https://rocm.docs.amd.com/projects/HIP/en/latest/doxygen/html/group___occupancy.
 ## Exercise 1: The empty kernel
 
 Measure empty kernel launch latency via the empty kernel; see how this
-is affected by the number of waves, threa-block size, and LDS use.
+is affected by the number of waves, thread-block size, and LDS use.
 
 
 ## Exercise 2: Occupancy computation and measurement
