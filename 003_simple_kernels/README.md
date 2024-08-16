@@ -13,6 +13,17 @@ cmake -DCMAKE_INSTALL_PREFIX=${HOME}/cmake .. && make && make install
 export PATH=${HOME}/cmake/bin:${PATH}
 ```
 
+When using the hip-programming language in cmake, you can just compile with
+
+## ROCm-backend configuration:
+```sh
+cmake ..
+```
+
+If you're using the older cmake, which doesn't support the hip
+language, then you will need to manually specify a C++ compiler which
+understands hip:
+
 ## ROCm-backend configuration:
 ```sh
 cmake -DCMAKE_CXX_COMPILER=amdclang++ ..
