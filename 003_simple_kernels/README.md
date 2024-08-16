@@ -66,7 +66,7 @@ Compute the sum of two vectors of arbitrary length for general
 thread-block sizes by having each thread compute 4 terms.  Organize the
 threads in two ways:
  - by having each thread treat 4 contiguous terms.  For example, thread 0
- computes terms {0, 1, 2, 3}, thread 1 computes terms {5, 6, 7, 8}, etc.
+ computes terms {0, 1, 2, 3}, thread 1 computes terms {4, 5, 6, 7}, etc.
   - by having contiguous threads treat contiguous terms.  For example,
  thread 0 computes terms {0, N/4, 2N/4, 3N/4}, and thread 1 computes
  terms {1, N/4 + 1, 2N/4 + 1, 3N/4 + 1}, etc.
