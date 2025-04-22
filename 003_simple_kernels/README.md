@@ -1,10 +1,5 @@
 # Environment, configuration, and compilation:
 
-## Set up your cmake environment to detect ROCm:
-```sh
-export CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/rocm/lib/cmake/
-```
-
 Upgrade to a later cmake (something like 3.21 or later; may need to
 install libssl-dev on ubuntu).
 Grab the source files, and then build and install with:
