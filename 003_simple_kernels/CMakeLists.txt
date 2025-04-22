@@ -34,7 +34,7 @@ else()
   message( STATUS "HIP_PLATFORM: amd" )
 endif()
 
-find_package( hip REQUIRED )
+find_package( hip REQUIRED CONFIG PATHS /opt/rocm/lib/cmake/hip/ )
 
 set( example_list
   ex1_errors
