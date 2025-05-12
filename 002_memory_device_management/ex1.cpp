@@ -1,15 +1,20 @@
+#include <iostream>
 #include <hip/hip_runtime.h>
+using namespace std;
 
-int main() {
-  // Query device count using HIP API and print result
-  /*** Insert code here ***/
+__global__ void helloFromGPU(){
 
-  // Query device properties using HIP API
-  // Print device name and total global memory size for each device
-  /*** Insert code here ***/
+int tid = blockIdx.x * blockDim.x + threadIdx.x;
+printf("Hello from GPU, thread number: %d \n", tid);
 
-  // Inspect the other device properties and read up on them
-  /*** Insert code here ***/
+}
 
-  return 0;
+void helloFromCPU(){
+cout<<"Hello from CPU! " << endl;
+}
+
+int main(){
+helloFromGPU<<<1,16>>>();
+helloFromCPU();
+return 0;
 }

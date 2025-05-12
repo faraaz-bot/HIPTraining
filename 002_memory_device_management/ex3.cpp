@@ -1,54 +1,65 @@
+#include <iostream>
 #include <hip/hip_runtime.h>
-#include <malloc.h>
 using namespace std;
 
-void compareArrays(int* hostArray0, int* deviceArray, int numElems) {
-  for (auto i=0; i<numElems; i++) {
-    assert(hostArray0[i] == deviceArray[i]);
+void compareArrays(int* hostArray, int* deviceArray, int numElems);
+{
+for(auto int i = 0, i < numElems; i++){
+  assert(hostArray[i] == deviceArray[i]);
   }
+  printf("The arrays are equal");
 }
 
-int main() {
-  // Allocate hostArray0 and initialize it
+int main(){
+  //Allocate hostArray0 and initialize it.
+
   int numElems = 256;
+  int arraySize = sizeof(int) * numElems;
   int hostArray0[numElems];
-  for (auto i=0; i<numElems; i++) {
+
+  for(auto int i = 0; i < numElems, i++){
     hostArray0[i] = i;
   }
 
   // Set current device to 0
-  /*** Insert code here ***/
+  hipSetDevice(0);
 
   // Confirm that current device is 0
-  /*** Insert code here ***/
+  int device;
+  hipGetDevice(&device);
+  printf("This device ID is: %d", device);
 
   // Allocate an array on device 0 and copy hostArray0 to deviceArray0
-  /*** Insert code here ***/
-
-  // Allocate an array on device 1 and copy deviceArray0 to deviceArray1
-  /*** Insert code here ***/
-
-  // Compare the values of the entire deviceArray0 and deviceArray1 and assert if values don't match
-  /*** Insert code here ***/
-
+  int* deviceArray0;
+  hipMalloc(&deviceArray0, arraySize);
+  hipMemcpy(deviceArray0, hostArray0, arraySize, hipMemcpyHostToDevice);
+  
   // Allocate hostArray1
+
   int hostArray1[numElems];
 
   // Copy deviceArray1 to hostArray1
-  /*** Insert code here ***/
-
-  // Compare the values of the entire hostArray0 and hostArray1 and assert if values don't match
-  /*** Insert code here ***/
+  hipMemcpy(hostArray1, deviceArray1, arraySize, hipMemcpyDeviceToHost);
 
   // Free the host and device arrays, as applicable
-  /*** Insert code here ***/
+  hipFree(deviceArray0);
+  hipFree(deviceArray1);
 
   // Set current device to (deviceCount + 1) and capture the error
-  /*** Insert code here ***/
+  int count;
+  hipGetDeviceCount(&count);
+  hipError_t error = hipSetDevice(count + 1);
+  cout << "Error: " << hipGetErrorString(error) << endl;
 
   // Allocate a host array and try to free it using HIP and capture the error
-  /*** Insert code here ***/
-
-  return 0;
+  int hostArray2[numElems];
+  error = hipFree(&hostArray2);
+  cout << "Error: " << hipGetErrorString(error) << endl;
+  
+  int* hostArray3 = new int[numElems];
+  error = hipFree(hostArray3);
+  cout << "Error: " << hipGetErrorString(error) << endl;
+  delete[] hostArray3;
+  
+return 0;
 }
-
