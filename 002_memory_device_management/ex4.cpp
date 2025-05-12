@@ -1,4 +1,5 @@
 #include <hip/hip_runtime.h>
+#include <iostream>
 
 int main() {
   //Allocate a device array that requires twice the number of 
