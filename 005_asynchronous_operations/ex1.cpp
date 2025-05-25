@@ -29,15 +29,51 @@ int main(int argc, char* argv[])
     // Verify your assembly by visualizing profiler data generated with
     // rocprof
 
-    // Car assembly
-    for(int i = 0; i < NCARS; ++i)
+    // Further modify your code, such that the host path gets fully unblocked
+    // while still pipelining the sequential host only 'InsertEngine' part.
+
+    // Verify your solution by checking the 'Host was blocked for' timer. It
+    // should only show very few miliseconds.
+
+    // Prime the pipeline
+    AssembleFrame(&cars[0]);
+
+    AssembleFrame(&cars[1]);
+    InsertEngine(&cars[0]);
+
+    AssembleFrame(&cars[2]);
+    InsertEngine(&cars[1]);
+    PaintAndInstallBody(&cars[0]);
+
+    AssembleFrame(&cars[3]);
+    InsertEngine(&cars[2]);
+    PaintAndInstallBody(&cars[1]);
+    InstallWheelsAndTires(&cars[0]);
+
+    // Asynchronous car assembly
+    for(int i = 2; i < NCARS - 2; ++i)
     {
-        AssembleFrame(&cars[i]);
-        InsertEngine(&cars[i]);
+        AssembleFrame(&cars[i + 2]);
+        InsertEngine(&cars[i + 1]);
         PaintAndInstallBody(&cars[i]);
-        InstallWheelsAndTires(&cars[i]);
-        ShipToCustomer(&cars[i]);
+        InstallWheelsAndTires(&cars[i - 1]);
+        ShipToCustomer(&cars[i - 2]);
     }
+
+    // Empty the pipeline
+    ShipToCustomer(&cars[NCARS - 4]);
+
+    InstallWheelsAndTires(&cars[NCARS - 3]);
+    ShipToCustomer(&cars[NCARS - 3]);
+
+    PaintAndInstallBody(&cars[NCARS - 2]);
+    InstallWheelsAndTires(&cars[NCARS - 2]);
+    ShipToCustomer(&cars[NCARS - 2]);
+
+    InsertEngine(&cars[NCARS - 1]);
+    PaintAndInstallBody(&cars[NCARS - 1]);
+    InstallWheelsAndTires(&cars[NCARS - 1]);
+    ShipToCustomer(&cars[NCARS - 1]);
 
     /***************************************
      Modify this function above as required
