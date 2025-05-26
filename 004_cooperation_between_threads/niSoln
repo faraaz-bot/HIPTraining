@@ -1,0 +1,93 @@
+#include <cmath>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <hip/hip_runtime.h>
+
+inline __device__ float integrand(float x)
+{
+    return sqrtf(1.0f - x * x);
+}
+
+__global__ void GenTrapezoids(float x0, float dx, int n, float* f)
+{
+    int gid = threadIdx.x + blockDim.x * blockIdx.x;
+    if(gid >= n)
+        return;
+
+    float x = x0 + gid * dx;
+    f[gid]  = 0.5f * (integrand(x) + integrand(x + dx)) * dx;
+}
+
+__global__ void reduceKernel(float* dOut, const float* dIn)
+{
+    extern __shared__ float sData[];
+
+    int gid = threadIdx.x + blockDim.x * blockIdx.x;
+    int tid = threadIdx.x;
+
+    sData[tid] = dIn[gid];
+    __syncthreads();
+
+    for(int s = blockDim.x / 2; s > 0; s >>= 1)
+    {
+        if(tid < s)
+            sData[tid] += sData[tid + s];
+        __syncthreads();
+    }
+
+    if(tid == 0)
+    {
+        dOut[blockIdx.x] = sData[0];
+    }
+}
+
+float simplePi(int n)
+{
+    int const threadsPerBlock = 1024;
+
+    // Initialization
+    float  piOverTwo;
+    float* riemannSummands;
+    float* reduction;
+    size_t riemannSumBytes = n * sizeof(float);
+    size_t reductionBytes  = n / (threadsPerBlock) * sizeof(float);
+
+    // Allocation
+    hipMalloc(&riemannSummands, riemannSumBytes);
+    hipMalloc(&reduction, reductionBytes);
+
+    // Kernel
+    if(n % threadsPerBlock != 0)
+        return -1.f;
+    if(n / threadsPerBlock > threadsPerBlock) // two-stage reduction at most
+        return -1.f;
+
+    dim3 blockDim(threadsPerBlock);
+    dim3 gridDim(n / threadsPerBlock);
+
+    // Integration parameters
+    float x1 = -1.0f;
+    float x2 = 1.0f;
+    float dx = (x2 - x1) / n;
+
+    GenTrapezoids<<<gridDim, blockDim>>>(x1, dx, n, riemannSummands);
+
+    // Reduction Phase
+    size_t smemBytes = threadsPerBlock * sizeof(float);
+    reduceKernel<<<gridDim, blockDim, smemBytes>>>(reduction, riemannSummands);
+    reduceKernel<<<1, gridDim, smemBytes>>>(reduction, reduction);
+
+    hipMemcpy(&piOverTwo, reduction, sizeof(float), hipMemcpyDeviceToHost);
+
+    hipFree(reduction);
+    hipFree(riemannSummands);
+
+    return 2 * piOverTwo;
+}
+
+int main()
+{
+    std::cout << "pi = " << simplePi(32 * 1024) << std::endl;
+}
